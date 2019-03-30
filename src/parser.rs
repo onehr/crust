@@ -34,7 +34,7 @@ fn p_fn(
     toks: &Vec<lexer::TokType>,
     pos: usize,
 ) -> Result<(ParseNode, usize), String> {
-    println!("into function p_fn");
+    //println!("into function p_fn");
     let tok = &toks[pos];
     if *tok != lexer::TokType::Kwd(lexer::KwdType::Int) {
         //Err(format!("Expected `int`, found {:?} at {}", toks[pos], pos));
@@ -82,7 +82,7 @@ fn p_fn(
     let mut fn_node = ParseNode::new();
     fn_node.entry = NodeType::Fn("main".to_string());
     fn_node.child.push(stmt_node);
-    println!("out function p_fn with pos = {}", pos);
+    //println!("out function p_fn with pos = {}", pos);
     Ok((fn_node, pos))
 }
 
@@ -90,7 +90,7 @@ fn p_stmt(
     toks: &Vec<lexer::TokType>,
     pos: usize,
 ) -> Result<(ParseNode, usize), String> {
-    println!("into function p_stmt");
+    //println!("into function p_stmt");
 
     let tok = &toks[pos];
     if *tok != lexer::TokType::Kwd(lexer::KwdType::Ret) {
@@ -114,7 +114,7 @@ fn p_stmt(
     let mut stmt_node = ParseNode::new();
     stmt_node.entry = NodeType::Stmt;
     stmt_node.child.push(exp_node);
-    println!("out function p_stmt with pos = {}, tok = {:?}", pos, toks[pos]);
+    //println!("out function p_stmt with pos = {}, tok = {:?}", pos, toks[pos]);
     Ok((stmt_node, pos))
 }
 
@@ -122,7 +122,7 @@ fn p_exp(
     toks: &Vec<lexer::TokType>,
     pos: usize,
 ) -> Result<(ParseNode, usize), String> {
-    println!("into function p_exp");
+    //println!("into function p_exp");
     let tok = &toks[pos];
     if *tok != lexer::TokType::Literal(2) {
         //Err(format!("Expected 'literal(2)`, found {:?} at {}", toks[pos], pos));
@@ -132,11 +132,11 @@ fn p_exp(
 
     let mut exp_node = ParseNode::new();
     exp_node.entry = NodeType::Exp(2);
-    println!("out function p_exp with pos = {}, tok = {:?}", pos, toks[pos]);
+    //println!("out function p_exp with pos = {}, tok = {:?}", pos, toks[pos]);
     Ok((exp_node, pos))
 }
 
-pub fn parse_prog(input: &String) -> Result<ParseNode, String> {
+pub fn parse_prog(input: &String, c_src_name: &String) -> Result<ParseNode, String> {
     let toks_res = lexer::lex(&input);
     let mut toks: std::vec::Vec<lexer::TokType> = Vec::new();
 
@@ -146,7 +146,10 @@ pub fn parse_prog(input: &String) -> Result<ParseNode, String> {
     }
     p_fn(&toks, 0).and_then(|(n, i)| {
         if i == toks.len() {
-            Ok(n)
+            let mut prog_node = ParseNode::new();
+            prog_node.entry = NodeType::Prog(c_src_name.to_string());
+            prog_node.child.push(n);
+            Ok(prog_node)
         } else {
             Err(format!(
                 "Expected end of input, found {:?} at {}",
@@ -154,4 +157,28 @@ pub fn parse_prog(input: &String) -> Result<ParseNode, String> {
             ))
         }
     })
+}
+
+pub fn print(tree: &ParseNode, idt: usize) -> String {
+    let mut idt_prefix = String::new();
+    for i in 0..idt {
+        idt_prefix = idt_prefix + "    ";
+    }
+    match &tree.entry {
+        NodeType::Prog(prog_name) => {
+            format!("{}NodeType: Prog, Name:{} [\n{}\n{}]",idt_prefix, prog_name,
+            print(tree.child.get(0).expect("parens need one child"), idt+1), idt_prefix)
+        }
+        NodeType::Fn(fn_name) => {
+            format!("{}NodeType: Fn, Name: {} [\n{}\n{}]", idt_prefix, fn_name,
+            print(tree.child.get(0).expect("no child"), idt+1), idt_prefix)
+        }
+        NodeType::Stmt => {
+            format!("{}NodeType: Stmt, [\n{}\n{}]", idt_prefix,
+            print(tree.child.get(0).expect("no child"), idt+1), idt_prefix)
+        }
+        NodeType::Exp(n) => {
+            format!("{}NodeType: Exp, Value: {}", idt_prefix, n)
+        }
+    }
 }

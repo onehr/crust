@@ -22,42 +22,41 @@ fn main() {
     // TODO: add better error messages.
     let contents = fs::read_to_string(c_src_name).expect("Can't read file");
 
-    println!("----------------------------");
-    println!("SOURCE_FILE:{}", c_src_name);
-    println!("----------------------------");
+    println!("--------------------------------");
+    println!("SOURCE_FILE: [{}]", c_src_name);
+    println!("--------------------------------");
     println!("{}", contents);
-    println!("----------------------------");
 
-    let token_list_res = lexer::lex(&contents);
+    // TODO: use try! macro later, now will get error
     let mut token_list = Vec::new();
-    //let mut token_list: &std::vec::Vec<_>;
-
-    match token_list_res {
+    match lexer::lex(&contents) {
         Ok(n) => {
             token_list = n;
         }
         Err(_) => panic!("Can not lex properly!"),
     }
+
+    println!("--------------------------------");
+    println!("Token List : ");
     println!("{:?}", token_list);
     println!("number of tokens: {}", token_list.len());
-    /*
-    let mut it = token_list.iter().peekable();
 
-    while let Some(&c) = it.peek() {
-        println!("c = {:?}", c);
-        it.next();
-    }*/
-    let parse_nodes = parser::parse_prog(&contents);
-    println!("{:?}", parse_nodes);
-    //let mut it = token_list.iter().peekable();
-    //let parse_nodes = parser::parse_prog(token_list, &mut it);
-    //println!("{:?}", parse_nodes);
+    let mut root_node = parser::ParseNode::new();
+    match parser::parse_prog(&contents, c_src_name) {
+        Ok(n) => {
+            root_node = n;
+        }
+        _ => panic!("Can not parse properly"),
+    }
+    println!("--------------------------------");
+    println!("AST nodes:\n{}", parser::print(&root_node, 0));
+
     //fs::write(s_src_name, s_contents).expect("Can't write assembly code");
 }
 
 fn print_usage() {
-    println!("-------------------------------");
+    println!("--------------------------------");
     println!("Copyright (c) 2019, Haoran Wang");
-    println!("-------------------------------");
+    println!("--------------------------------");
     println!("Usage: crust src_file[.c]\n");
 }
