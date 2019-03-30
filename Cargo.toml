@@ -1,0 +1,7 @@
+[package]
+name = "crust"
+version = "0.1.0"
+authors = ["onehrxn <waharaxn@gmail.com>"]
+edition = "2018"
+
+[dependencies]
