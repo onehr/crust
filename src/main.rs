@@ -5,7 +5,11 @@ use lexer::lex;
 use std::env;
 use std::fs;
 
-fn main() {
+use std::fs::File;
+use std::io;
+use std::io::prelude::*;
+
+fn main() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
 
     // first check the length of args is 2.
@@ -13,7 +17,7 @@ fn main() {
     // TODO: need to add more options later
     if args.len() <= 1 {
         print_usage();
-        return;
+        return Ok(());
     }
 
     let c_src_name = &args[1];
@@ -27,31 +31,18 @@ fn main() {
     println!("--------------------------------");
     println!("{}", contents);
 
-    // TODO: use try! macro later, now will get error
-    let mut token_list = Vec::new();
-    match lexer::lex(&contents) {
-        Ok(n) => {
-            token_list = n;
-        }
-        Err(_) => panic!("Can not lex properly!"),
-    }
-
+    let token_list = r#try!(lexer::lex(&contents));
     println!("--------------------------------");
     println!("Token List : ");
     println!("{:?}", token_list);
     println!("number of tokens: {}", token_list.len());
 
-    let mut root_node = parser::ParseNode::new();
-    match parser::parse_prog(&contents, c_src_name) {
-        Ok(n) => {
-            root_node = n;
-        }
-        _ => panic!("Can not parse properly"),
-    }
+    let root_node = r#try!(parser::parse_prog(&contents, c_src_name));
+
     println!("--------------------------------");
     println!("AST nodes:\n{}", parser::print(&root_node, 0));
-
     //fs::write(s_src_name, s_contents).expect("Can't write assembly code");
+    Ok(())
 }
 
 fn print_usage() {
