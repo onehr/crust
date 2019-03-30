@@ -1,7 +1,9 @@
+mod lexer;
+mod parser;
+use lexer::lex;
+
 use std::env;
 use std::fs;
-
-mod lexer;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -26,8 +28,30 @@ fn main() {
     println!("{}", contents);
     println!("----------------------------");
 
-    let token_list = lexer::lexer::lex(&contents);
+    let token_list_res = lexer::lex(&contents);
+    let mut token_list = Vec::new();
+    //let mut token_list: &std::vec::Vec<_>;
+
+    match token_list_res {
+        Ok(n) => {
+            token_list = n;
+        }
+        Err(_) => panic!("Can not lex properly!"),
+    }
     println!("{:?}", token_list);
+    println!("number of tokens: {}", token_list.len());
+    /*
+    let mut it = token_list.iter().peekable();
+
+    while let Some(&c) = it.peek() {
+        println!("c = {:?}", c);
+        it.next();
+    }*/
+    let parse_nodes = parser::parse_prog(&contents);
+    println!("{:?}", parse_nodes);
+    //let mut it = token_list.iter().peekable();
+    //let parse_nodes = parser::parse_prog(token_list, &mut it);
+    //println!("{:?}", parse_nodes);
     //fs::write(s_src_name, s_contents).expect("Can't write assembly code");
 }
 
