@@ -16,8 +16,8 @@ pub enum NodeType {
 
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct ParseNode {
-    child: Vec<ParseNode>,
-    entry: NodeType,
+    pub child: Vec<ParseNode>,
+    pub entry: NodeType,
 }
 
 impl ParseNode {
@@ -160,20 +160,29 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
             "{}NodeType: Prog, Name:{} [\n{}\n{}]",
             idt_prefix,
             prog_name,
-            print(tree.child.get(0).expect("parens need one child"), idt + 1),
+            print(
+                tree.child.get(0).expect("Program Node has no child"),
+                idt + 1
+            ),
             idt_prefix
         ),
         NodeType::Fn(fn_name) => format!(
             "{}NodeType: Fn, Name: {} [\n{}\n{}]",
             idt_prefix,
             fn_name,
-            print(tree.child.get(0).expect("no child"), idt + 1),
+            print(
+                tree.child.get(0).expect("Function Node has no child"),
+                idt + 1
+            ),
             idt_prefix
         ),
         NodeType::Stmt => format!(
             "{}NodeType: Stmt, [\n{}\n{}]",
             idt_prefix,
-            print(tree.child.get(0).expect("no child"), idt + 1),
+            print(
+                tree.child.get(0).expect("Statement Node has no child"),
+                idt + 1
+            ),
             idt_prefix
         ),
         NodeType::Exp(n) => format!("{}NodeType: Exp, Value: {}", idt_prefix, n),

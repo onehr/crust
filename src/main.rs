@@ -1,10 +1,11 @@
+mod gen;
 mod lexer;
 mod parser;
+
 use lexer::lex;
 
 use std::env;
 use std::fs;
-
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
@@ -15,7 +16,7 @@ fn main() -> Result<(), String> {
     // first check the length of args is 2.
     // format: crust source.c output.s
     // TODO: need to add more options later
-    if args.len() <= 1 {
+    if args.len() != 3 {
         print_usage();
         return Ok(());
     }
@@ -23,7 +24,6 @@ fn main() -> Result<(), String> {
     let c_src_name = &args[1];
     let s_src_name = &args[2];
 
-    // TODO: add better error messages.
     let contents = fs::read_to_string(c_src_name).expect("Can't read file");
 
     println!("--------------------------------");
@@ -41,7 +41,12 @@ fn main() -> Result<(), String> {
 
     println!("--------------------------------");
     println!("AST nodes:\n{}", parser::print(&root_node, 0));
-    //fs::write(s_src_name, s_contents).expect("Can't write assembly code");
+
+    println!("--------------------------------");
+    let s_contents = gen::gen_as(&root_node);
+    println!("AS FILE:\n{}", s_contents);
+    fs::write(s_src_name, s_contents).expect("Can't write assembly code");
+
     Ok(())
 }
 
