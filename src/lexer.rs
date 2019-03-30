@@ -3,19 +3,34 @@ use std::iter::Peekable;
 pub mod lexer {
 
     #[derive(Eq, PartialEq, Clone, Debug)]
-    pub enum TokenType {
-        LBrace,    // {
-        RBrace,    // }
-        LParen,    // (
-        RParen,    // )
-        SEMICOLON, // ;
-        INT,       // int
-        RET,       // return
-        IDENTIFIER(String),
-        LITERAL(i64), // [0-9]+
+    pub enum KwdType {
+        INT,   // int
+        VOID,  // void
+        RET,   // return
+        IF,    // if
+        ELSE,  // else
+        WHILE, // while
+        FOR,   // for
     }
 
-    pub fn lex(input: &String) -> Result<Vec<TokenType>, String> {
+    #[derive(Eq, PartialEq, Clone, Debug)]
+    pub enum TokType {
+        Kwd(KwdType),
+        LBrace,             // {
+        RBrace,             // }
+        LParen,             // (
+        RParen,             // )
+        SEMICOLON,          // ;
+        EQ,                 // =
+        LT,                 // <
+        GT,                 // >
+        PLUS,               // +
+        MINUS,              // -
+        LITERAL(i64),       // [0-9]+
+        IDENTIFIER(String), // identifier
+    }
+
+    pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
         let mut result = Vec::new();
 
         let mut it = input.chars().peekable();
@@ -24,14 +39,16 @@ pub mod lexer {
             match c {
                 '0'...'9' => {
                     it.next();
-                    let mut number = c.to_string().parse::<i64>()
+                    let mut number = c
+                        .to_string()
+                        .parse::<i64>()
                         .expect("The caller should have passed a digit.");
-                    while let Some(Ok(digit)) = it.peek()
-                        .map(|c| c.to_string().parse::<i64>()) {
-                            number = number * 10 + digit;
-                            it.next();
-                        }
-                    result.push(TokenType::LITERAL(number));
+
+                    while let Some(Ok(digit)) = it.peek().map(|c| c.to_string().parse::<i64>()) {
+                        number = number * 10 + digit;
+                        it.next();
+                    }
+                    result.push(TokType::LITERAL(number));
                 }
                 'a'...'z' | 'A'...'Z' | '_' => {
                     it.next();
@@ -43,33 +60,60 @@ pub mod lexer {
                                 s.push(tmp);
                                 it.next();
                             }
-                            _ => {break;}
+                            _ => {
+                                break;
+                            }
                         }
                     }
                     match s.as_ref() {
-                        "int" => result.push(TokenType::INT),
-                        "return" => result.push(TokenType::RET),
-                        _ => result.push(TokenType::IDENTIFIER(s)),
+                        "int" => result.push(TokType::Kwd(KwdType::INT)),
+                        "return" => result.push(TokType::Kwd(KwdType::RET)),
+                        "void" => result.push(TokType::Kwd(KwdType::VOID)),
+                        "if" => result.push(TokType::Kwd(KwdType::IF)),
+                        "else" => result.push(TokType::Kwd(KwdType::ELSE)),
+                        "while" => result.push(TokType::Kwd(KwdType::WHILE)),
+                        "for" => result.push(TokType::Kwd(KwdType::FOR)),
+                        _ => result.push(TokType::IDENTIFIER(s)),
                     }
                 }
                 '(' => {
-                    result.push(TokenType::LParen);
+                    result.push(TokType::LParen);
                     it.next();
                 }
                 ')' => {
-                    result.push(TokenType::RParen);
+                    result.push(TokType::RParen);
                     it.next();
                 }
                 '{' => {
-                    result.push(TokenType::LBrace);
+                    result.push(TokType::LBrace);
                     it.next();
                 }
                 '}' => {
-                    result.push(TokenType::RBrace);
+                    result.push(TokType::RBrace);
                     it.next();
                 }
                 ';' => {
-                    result.push(TokenType::SEMICOLON);
+                    result.push(TokType::SEMICOLON);
+                    it.next();
+                }
+                '=' => {
+                    result.push(TokType::EQ);
+                    it.next();
+                }
+                '<' => {
+                    result.push(TokType::LT);
+                    it.next();
+                }
+                '>' => {
+                    result.push(TokType::GT);
+                    it.next();
+                }
+                '+' => {
+                    result.push(TokType::PLUS);
+                    it.next();
+                }
+                '-' => {
+                    result.push(TokType::MINUS);
                     it.next();
                 }
                 ' ' | '\n' | '\t' | '\r' => {

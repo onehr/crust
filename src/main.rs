@@ -9,7 +9,7 @@ fn main() {
     // first check the length of args is 2.
     // format: crust source.c output.s
     // TODO: need to add more options later
-    if args.len() != 2 {
+    if args.len() <= 1 {
         print_usage();
         return;
     }
@@ -29,7 +29,6 @@ fn main() {
     let token_list = lexer::lexer::lex(&contents);
     println!("{:?}", token_list);
     //fs::write(s_src_name, s_contents).expect("Can't write assembly code");
-
 }
 
 fn print_usage() {
