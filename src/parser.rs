@@ -11,7 +11,11 @@ pub enum NodeType {
     Prog(String),
     Fn(String),
     Stmt,
-    Exp(i64),
+    //Exp(i64),
+    Exp,
+    Const(i64),
+    //UnExp((lexer::TokType, Box<NodeType>)),
+    UnExp(lexer::TokType),
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -92,8 +96,11 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
             toks[pos], pos
         ));
     }
+    let mut exp_node = ParseNode::new();
+    exp_node.entry = NodeType::Exp;
     let pos = pos + 1;
-    let (exp_node, mut pos) = r#try!(p_exp(toks, pos));
+    let (exp_child_node, mut pos) = r#try!(p_exp(toks, pos));
+    exp_node.child.push(exp_child_node);
 
     let tok = &toks[pos];
     if *tok != lexer::TokType::Semicolon {
@@ -110,26 +117,49 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
 fn p_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
     let tok = &toks[pos];
     let mut literal: i64 = 0;
+    // make exp_node
     match tok {
         lexer::TokType::Literal(n) => {
             literal = *n;
+            if *tok != lexer::TokType::Literal(literal) {
+                return Err(format!(
+                    "Expected `literal({})`, found {:?} at {}",
+                    literal, toks[pos], pos
+                ));
+            }
+            let mut const_node = ParseNode::new();
+            const_node.entry = NodeType::Const(literal);
+            let pos = pos + 1;
+            return Ok((const_node, pos));
+        }
+        lexer::TokType::Minus => {
+            let mut exp_node = ParseNode::new();
+            exp_node.entry = NodeType::UnExp(lexer::TokType::Minus);
+            let pos = pos + 1;
+            let (exp_child_node, mut pos) = r#try!(p_exp(toks, pos));
+            exp_node.child.push(exp_child_node);
+            return Ok((exp_node, pos));
+        }
+        lexer::TokType::Tilde => {
+            let mut exp_node = ParseNode::new();
+            exp_node.entry = NodeType::UnExp(lexer::TokType::Tilde);
+            let pos = pos + 1;
+            let (exp_child_node, mut pos) = r#try!(p_exp(toks, pos));
+            exp_node.child.push(exp_child_node);
+            return Ok((exp_node, pos));
+        }
+        lexer::TokType::Exclamation => {
+            let mut exp_node = ParseNode::new();
+            exp_node.entry = NodeType::UnExp(lexer::TokType::Exclamation);
+            let pos = pos + 1;
+            let (exp_child_node, mut pos) = r#try!(p_exp(toks, pos));
+            exp_node.child.push(exp_child_node);
+            return Ok((exp_node, pos));
         }
         _ => {
-            return Err(format!("Expect literal number"));
+            return Err(format!("Expect expression"));
         }
     }
-
-    if *tok != lexer::TokType::Literal(literal) {
-        return Err(format!(
-            "Expected `literal({})`, found {:?} at {}",
-            literal, toks[pos], pos
-        ));
-    }
-    let pos = pos + 1;
-
-    let mut exp_node = ParseNode::new();
-    exp_node.entry = NodeType::Exp(literal);
-    Ok((exp_node, pos))
 }
 
 pub fn parse_prog(input: &String, c_src_name: &String) -> Result<ParseNode, String> {
@@ -161,7 +191,7 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
             idt_prefix,
             prog_name,
             print(
-                tree.child.get(0).expect("Program Node has no child"),
+                tree.child.get(0).expect("Progam Node has no child"),
                 idt + 1
             ),
             idt_prefix
@@ -185,6 +215,32 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
             ),
             idt_prefix
         ),
-        NodeType::Exp(n) => format!("{}NodeType: Exp, Value: {}", idt_prefix, n),
+        NodeType::Exp => format!(
+            "{}NodeType: Exp, [\n{}\n{}]",
+            idt_prefix,
+            print(
+                tree.child.get(0).expect("Expression Node has no child"),
+                idt + 1
+            ),
+            idt_prefix
+        ),
+        NodeType::UnExp(Op) => format!(
+            "{}NodeType: UnExp, Op: {}, [\n{}\n{}]",
+            idt_prefix,
+            match Op {
+                lexer::TokType::Minus => "-".to_string(),
+                lexer::TokType::Tilde => "~".to_string(),
+                lexer::TokType::Exclamation => "!".to_string(),
+                _ => panic!("Operator for Unary Expression not supported"),
+            },
+            print(
+                tree.child
+                    .get(0)
+                    .expect("Unary Expression Node has no child"),
+                idt + 1
+            ),
+            idt_prefix
+        ),
+        NodeType::Const(n) => format!("{}NodeType: Const, Value: {}", idt_prefix, n),
     }
 }

@@ -109,3 +109,128 @@ if [ "$a" -eq "$b" ]; then
 else
     echo -e "[Error]"
 fi
+
+src=test/valid/bitwise.c
+dst=gen/bitwise.s
+./target/debug/crust $src $dst
+gcc -o a.out $dst
+./a.out
+a=$?
+gcc -o b.out $src
+./b.out
+b=$?
+inc=$(($inc+1))
+echo "TEST $inc: [$src]"
+echo "crustRet: $a gccRet: $b"
+if [ "$a" -eq "$b" ]; then
+    echo -e "${BLUE}[Passed]${NC}"
+else
+    echo -e "[Error]"
+fi
+src=test/valid/bitwise_zero.c
+dst=gen/bitwise_zero.s
+./target/debug/crust $src $dst
+gcc -o a.out $dst
+./a.out
+a=$?
+gcc -o b.out $src
+./b.out
+b=$?
+inc=$(($inc+1))
+echo "TEST $inc: [$src]"
+echo "crustRet: $a gccRet: $b"
+if [ "$a" -eq "$b" ]; then
+    echo -e "${BLUE}[Passed]${NC}"
+else
+    echo -e "[Error]"
+fi
+
+src=test/valid/neg.c
+dst=gen/neg.s
+./target/debug/crust $src $dst
+gcc -o a.out $dst
+./a.out
+a=$?
+gcc -o b.out $src
+./b.out
+b=$?
+inc=$(($inc+1))
+echo "TEST $inc: [$src]"
+echo "crustRet: $a gccRet: $b"
+if [ "$a" -eq "$b" ]; then
+    echo -e "${BLUE}[Passed]${NC}"
+else
+    echo -e "[Error]"
+fi
+
+src=test/valid/nested_ops.c
+dst=gen/nested_ops.s
+./target/debug/crust $src $dst
+gcc -o a.out $dst
+./a.out
+a=$?
+gcc -o b.out $src
+./b.out
+b=$?
+inc=$(($inc+1))
+echo "TEST $inc: [$src]"
+echo "crustRet: $a gccRet: $b"
+if [ "$a" -eq "$b" ]; then
+    echo -e "${BLUE}[Passed]${NC}"
+else
+    echo -e "[Error]"
+fi
+
+src=test/valid/nested_ops_2.c
+dst=gen/nested_ops_2.s
+./target/debug/crust $src $dst
+gcc -o a.out $dst
+./a.out
+a=$?
+gcc -o b.out $src
+./b.out
+b=$?
+inc=$(($inc+1))
+echo "TEST $inc: [$src]"
+echo "crustRet: $a gccRet: $b"
+if [ "$a" -eq "$b" ]; then
+    echo -e "${BLUE}[Passed]${NC}"
+else
+    echo -e "[Error]"
+fi
+
+src=test/valid/not_five.c
+dst=gen/not_five.s
+./target/debug/crust $src $dst
+gcc -o a.out $dst
+./a.out
+a=$?
+gcc -o b.out $src
+./b.out
+b=$?
+inc=$(($inc+1))
+echo "TEST $inc: [$src]"
+echo "crustRet: $a gccRet: $b"
+if [ "$a" -eq "$b" ]; then
+    echo -e "${BLUE}[Passed]${NC}"
+else
+    echo -e "[Error]"
+fi
+
+src=test/valid/not_zero.c
+dst=gen/not_zero.s
+./target/debug/crust $src $dst
+gcc -o a.out $dst
+./a.out
+a=$?
+gcc -o b.out $src
+./b.out
+b=$?
+inc=$(($inc+1))
+echo "TEST $inc: [$src]"
+echo "crustRet: $a gccRet: $b"
+if [ "$a" -eq "$b" ]; then
+    echo -e "${BLUE}[Passed]${NC}"
+else
+    echo -e "[Error]"
+fi
