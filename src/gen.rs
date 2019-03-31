@@ -7,7 +7,7 @@ pub fn gen_as(tree: &ParseNode) -> String {
     let idt_prefix = "        ".to_string(); // 8 white spaces
     match &tree.entry {
         NodeType::Prog(prog_name) => format!(
-            "{}.file \"{}\"\n{}",
+            ".code32\n{}.file \"{}\"\n{}",
             idt_prefix,
             prog_name,
             gen_as(tree.child.get(0).expect("Program node no child"))
@@ -52,6 +52,63 @@ pub fn gen_as(tree: &ParseNode) -> String {
             ),
             _ => format!(""),
         },
+        NodeType::BinExp(Op) => match Op {
+            lexer::TokType::Plus => format!(
+                "{}\
+                 {}pushl %eax\n\
+                 {}\
+                 {}popl %ecx\n\
+                 {}addl %ecx, %eax\n",
+                gen_as(tree.child.get(0).expect("BinExp has no lhs")),
+                idt_prefix,
+                gen_as(tree.child.get(1).expect("BinExp has no rhs")),
+                idt_prefix,
+                idt_prefix
+            ),
+            lexer::TokType::Minus => format!(
+                "{}\
+                 {}pushl %eax\n\
+                 {}\
+                 {}popl %ecx\n\
+                 {}subl %ecx, %eax\n", // subl src, dst : dst - src -> dst
+                //   let %eax = dst = e1, %ecx = src = e2
+                gen_as(tree.child.get(1).expect("BinExp has no rhs")),
+                idt_prefix,
+                gen_as(tree.child.get(0).expect("BinExp has no lhs")),
+                idt_prefix,
+                idt_prefix
+            ),
+            lexer::TokType::Multi => format!(
+                "{}\
+                 {}pushl %eax\n\
+                 {}\
+                 {}popl %ecx\n\
+                 {}imul %ecx, %eax\n",
+                gen_as(tree.child.get(0).expect("BinExp has no lhs")),
+                idt_prefix,
+                gen_as(tree.child.get(1).expect("BinExp has no rhs")),
+                idt_prefix,
+                idt_prefix
+            ),
+            lexer::TokType::Splash => format!(
+                "{}\
+                 {}pushl %eax\n\
+                 {}\
+                 {}popl %ecx\n\
+                 {}xorl %edx, %edx\n\
+                 {}idivl %ecx\n",
+                // let eax = e1, edx = 0, ecx = e2
+                gen_as(tree.child.get(1).expect("BinExp has no rhs")),
+                idt_prefix,
+                gen_as(tree.child.get(0).expect("BinExp has no lhs")),
+                idt_prefix,
+                idt_prefix,
+                idt_prefix
+            ),
+            _ => format!(""),
+        },
+        NodeType::Term => gen_as(tree.child.get(0).expect("Term node no child")),
+        NodeType::Factor => gen_as(tree.child.get(0).expect("Factor node no child")),
         NodeType::Exp => gen_as(tree.child.get(0).expect("Expression node no child")),
         NodeType::Const(n) => format!("{}movl ${}, %eax\n", idt_prefix, n),
     }

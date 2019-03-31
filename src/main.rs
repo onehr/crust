@@ -25,21 +25,22 @@ fn main() -> Result<(), String> {
     let s_src_name = &args[2];
 
     let contents = fs::read_to_string(c_src_name).expect("Can't read file");
-
-    let token_list = r#try!(lexer::lex(&contents));
-    let root_node = r#try!(parser::parse_prog(&contents, c_src_name));
-    let s_contents = gen::gen_as(&root_node);
-
     // println!("--------------------------------");
     // println!("SOURCE_FILE: [{}]", c_src_name);
     // println!("--------------------------------");
     // println!("{}", contents);
+
+    let token_list = r#try!(lexer::lex(&contents));
     // println!("--------------------------------");
     // println!("Token List : ");
     // println!("{:?}", token_list);
     // println!("number of tokens: {}", token_list.len());
+
+    let root_node = r#try!(parser::parse_prog(&contents, c_src_name));
     // println!("--------------------------------");
     // println!("AST nodes:\n{}", parser::print(&root_node, 0));
+
+    let s_contents = gen::gen_as(&root_node);
     // println!("--------------------------------");
     // println!("AS FILE:\n{}", s_contents);
 

@@ -20,10 +20,12 @@ pub enum TokType {
     Eq,                 // =
     Lt,                 // <
     Gt,                 // >
-    Plus,               // +
     Minus,              // -
     Tilde,              // ~
     Exclamation,        // !
+    Plus,               // +
+    Multi,              // *
+    Splash,             // /
     Literal(i64),       // [0-9]+
     Identifier(String), // identifier
 }
@@ -106,10 +108,6 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
                 result.push(TokType::Gt);
                 it.next();
             }
-            '+' => {
-                result.push(TokType::Plus);
-                it.next();
-            }
             '-' => {
                 result.push(TokType::Minus);
                 it.next();
@@ -120,6 +118,18 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
             }
             '!' => {
                 result.push(TokType::Exclamation);
+                it.next();
+            }
+            '+' => {
+                result.push(TokType::Plus);
+                it.next();
+            }
+            '*' => {
+                result.push(TokType::Multi);
+                it.next();
+            }
+            '/' => {
+                result.push(TokType::Splash);
                 it.next();
             }
             ' ' | '\n' | '\t' | '\r' => {
