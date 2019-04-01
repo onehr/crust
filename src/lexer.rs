@@ -17,7 +17,7 @@ pub enum TokType {
     LParen,             // (
     RParen,             // )
     Semicolon,          // ;
-    Eq,                 // =
+    Assign,             // =
     Lt,                 // <
     Gt,                 // >
     Minus,              // -
@@ -28,6 +28,12 @@ pub enum TokType {
     Splash,             // /
     Literal(i64),       // [0-9]+
     Identifier(String), // identifier
+    And,                // &&
+    Or,                 // ||
+    Equal,              // ==
+    NotEqual,           // !=
+    LessEqual,          // <=
+    GreaterEqual,       // >=
 }
 
 pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
@@ -97,16 +103,56 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
                 it.next();
             }
             '=' => {
-                result.push(TokType::Eq);
                 it.next();
+                match it.peek() {
+                    Some(tmp) => match tmp {
+                        '=' => {
+                            result.push(TokType::Equal);
+                            it.next();
+                        }
+                        '>' => {
+                            result.push(TokType::GreaterEqual);
+                            it.next();
+                        }
+                        _ => {
+                            result.push(TokType::Assign);
+                        }
+                    },
+                    _ => return Err(format!("Can not peek next char")),
+                }
             }
             '<' => {
-                result.push(TokType::Lt);
                 it.next();
+                match it.peek() {
+                    Some(tmp) => match tmp {
+                        '=' => {
+                            it.next();
+                            result.push(TokType::LessEqual);
+                            it.next();
+                    }
+                        _ => {
+                            result.push(TokType::Lt);
+                            it.next();
+                        }
+                    },
+                    _ => return Err(format!("Can not peek next char")),
+                }
             }
             '>' => {
-                result.push(TokType::Gt);
                 it.next();
+                match it.peek() {
+                    Some(tmp) => match tmp {
+                        '=' => {
+                            result.push(TokType::GreaterEqual);
+                            it.next();
+                        }
+                        _ => {
+                            result.push(TokType::Gt);
+                            it.next();
+                        }
+                    },
+                    _ => return Err(format!("Can not peek next char")),
+                }
             }
             '-' => {
                 result.push(TokType::Minus);
@@ -117,8 +163,20 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
                 it.next();
             }
             '!' => {
-                result.push(TokType::Exclamation);
                 it.next();
+                match it.peek() {
+                    Some(tmp) => match tmp {
+                        '=' => {
+                            result.push(TokType::NotEqual);
+                            it.next();
+                        }
+                        _ => {
+                            result.push(TokType::Exclamation);
+                            it.next();
+                        }
+                    },
+                    _ => return Err(format!("Can not peek next char")),
+                }
             }
             '+' => {
                 result.push(TokType::Plus);
@@ -131,6 +189,38 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
             '/' => {
                 result.push(TokType::Splash);
                 it.next();
+            }
+            '&' => {
+                it.next();
+                match it.peek() {
+                    Some(tmp) => match tmp {
+                        '&' => {
+                            result.push(TokType::And);
+                            it.next();
+                        }
+                        _ => {
+                            // now don't support bitwise and, so just return Err
+                            return Err(format!("unexpected token &{}", c));
+                        }
+                    },
+                    _ => return Err(format!("Can not peek next char")),
+                }
+            }
+            '|' => {
+                it.next();
+                match it.peek() {
+                    Some(tmp) => match tmp {
+                        '|' => {
+                            result.push(TokType::Or);
+                            it.next();
+                        }
+                        _ => {
+                            // now don't support bitwise or, so just return Err
+                            return Err(format!("unexpected token {}", c));
+                        }
+                    },
+                    _ => return Err(format!("Can not peek next char")),
+                }
             }
             ' ' | '\n' | '\t' | '\r' => {
                 // skip
