@@ -172,7 +172,6 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
                         }
                         _ => {
                             result.push(TokType::Exclamation);
-                            it.next();
                         }
                     },
                     _ => return Err(format!("Can not peek next char")),

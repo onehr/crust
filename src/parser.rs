@@ -460,7 +460,12 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
                 lexer::TokType::NotEqual => format!("!="),
                 lexer::TokType::GreaterEqual => format!(">="),
                 lexer::TokType::LessEqual => format!("<="),
-                _ => panic!("Operator for Binary Expression not supported"),
+                lexer::TokType::Lt => format!("<"),
+                lexer::TokType::Gt => format!(">"),
+                _ => panic!(format!(
+                    "Operator `{:?}` for Binary Expression not supported",
+                    &Op
+                )),
             },
             print(tree.child.get(0).expect("BinExp no lhs"), idt + 1),
             print(tree.child.get(1).expect("BinExp no rhs"), idt + 1),

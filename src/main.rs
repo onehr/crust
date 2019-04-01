@@ -13,7 +13,7 @@ use std::io::prelude::*;
 fn main() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
 
-    // first check the length of args is 2.
+    // first check the length of args is 3.
     // format: crust source.c output.s
     // TODO: need to add more options later
     if args.len() != 3 {
@@ -37,8 +37,8 @@ fn main() -> Result<(), String> {
     // println!("number of tokens: {}", token_list.len());
 
     let root_node = r#try!(parser::parse_prog(&contents, c_src_name));
-    // println!("--------------------------------");
-    // println!("AST nodes:\n{}", parser::print(&root_node, 0));
+    //println!("--------------------------------");
+    //println!("AST nodes:\n{}", parser::print(&root_node, 0));
 
     let s_contents = gen::gen_as(&root_node);
     // println!("--------------------------------");
@@ -52,5 +52,5 @@ fn print_usage() {
     println!("--------------------------------");
     println!("Copyright (c) 2019, Haoran Wang");
     println!("--------------------------------");
-    println!("Usage: crust src_file[.c]\n");
+    println!("Usage: crust src_file[.c] out_file[.s]\n");
 }

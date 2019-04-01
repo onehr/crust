@@ -474,3 +474,116 @@ if [ "$a" -eq "$b" ]; then
 else
     echo -e "[Error]"
 fi
+srcdir=test/valid
+dstdir=gen
+
+src=$srcdir/and_false.c
+dst=$dstdir/and_false.s
+./target/debug/crust $src $dst
+gcc -o a.out $dst
+./a.out
+a=$?
+gcc -o b.out $src
+./b.out
+b=$?
+inc=$(($inc+1))
+echo "TEST $inc: [$src] -> [$dst]"
+echo "crustRet: $a gccRet: $b"
+if [ "$a" -eq "$b" ]; then
+    echo -e "${BLUE}[Passed]${NC}"
+else
+    echo -e "[Error]"
+fi
+# now try function to test
+test_fun() {
+    ./target/debug/crust $1 $2
+    gcc -o a.out $2
+    ./a.out
+    a=$?
+    gcc -o b.out $1
+    ./b.out
+    b=$?
+    inc=$(($inc+1))
+    echo "TEST $inc: [$1] -> [$2]"
+    echo "crustRet: $a gccRet: $b"
+    if [ "$a" -eq "$b" ]; then
+        echo -e "${BLUE}[Passed]${NC}"
+    else
+        echo -e "[Error]"
+    fi
+}
+src=$srcdir/and_true.c
+dst=$dstdir/and_true.s
+test_fun $src $dst
+
+src=$srcdir/eq_false.c
+dst=$dstdir/eq_false.s
+test_fun $src $dst
+
+src=$srcdir/eq_true.c
+dst=$dstdir/eq_true.s
+test_fun $src $dst
+
+src=$srcdir/ge_false.c
+dst=$dstdir/ge_false.s
+test_fun $src $dst
+
+src=$srcdir/ge_true.c
+dst=$dstdir/ge_true.s
+test_fun $src $dst
+
+src=$srcdir/gt_false.c
+dst=$dstdir/gt_false.s
+test_fun $src $dst
+
+src=$srcdir/gt_true.c
+dst=$dstdir/gt_true.s
+test_fun $src $dst
+
+src=$srcdir/le_false.c
+dst=$dstdir/le_false.s
+test_fun $src $dst
+
+src=$srcdir/le_true.c
+dst=$dstdir/le_true.s
+test_fun $src $dst
+
+src=$srcdir/lt_false.c
+dst=$dstdir/lt_false.s
+test_fun $src $dst
+
+src=$srcdir/lt_true.c
+dst=$dstdir/lt_true.s
+test_fun $src $dst
+
+src=$srcdir/ne_false.c
+dst=$dstdir/ne_false.s
+test_fun $src $dst
+
+src=$srcdir/ne_true.c
+dst=$dstdir/ne_true.s
+test_fun $src $dst
+
+src=$srcdir/or_false.c
+dst=$dstdir/or_false.s
+test_fun $src $dst
+
+src=$srcdir/or_true.c
+dst=$dstdir/or_true.s
+test_fun $src $dst
+
+src=$srcdir/precedence.c
+dst=$dstdir/precedence.s
+test_fun $src $dst
+
+src=$srcdir/precedence_2.c
+dst=$dstdir/precedence_2.s
+test_fun $src $dst
+
+src=$srcdir/precedence_3.c
+dst=$dstdir/precedence_3.s
+test_fun $src $dst
+
+src=$srcdir/precedence_4.c
+dst=$dstdir/precedence_4.s
+test_fun $src $dst
