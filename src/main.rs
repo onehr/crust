@@ -2,13 +2,8 @@ mod gen;
 mod lexer;
 mod parser;
 
-use lexer::lex;
-
 use std::env;
 use std::fs;
-use std::fs::File;
-use std::io;
-use std::io::prelude::*;
 
 fn main() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
@@ -37,10 +32,10 @@ fn main() -> Result<(), String> {
     // println!("number of tokens: {}", token_list.len());
 
     let root_node = r#try!(parser::parse_prog(&contents, c_src_name));
-    //println!("--------------------------------");
-    //println!("AST nodes:\n{}", parser::print(&root_node, 0));
+    // println!("--------------------------------");
+    // println!("AST nodes:\n{}", parser::print(&root_node, 0));
 
-    let s_contents = gen::gen_as(&root_node);
+    let s_contents = gen::gen_prog(&root_node);
     // println!("--------------------------------");
     // println!("AS FILE:\n{}", s_contents);
 

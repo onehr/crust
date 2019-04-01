@@ -2,6 +2,7 @@
 # build the project
 cargo fmt
 cargo build
+rm gen/*.s
 
 # now just test whether the number returned was right
 RED='\033[0;31m'
@@ -586,4 +587,40 @@ test_fun $src $dst
 
 src=$srcdir/precedence_4.c
 dst=$dstdir/precedence_4.s
+test_fun $src $dst
+
+src=$srcdir/assign.c
+dst=$dstdir/assign.s
+test_fun $src $dst
+
+src=$srcdir/assign_val.c
+dst=$dstdir/assign_val.s
+test_fun $src $dst
+
+src=$srcdir/exp_return_val.c
+dst=$dstdir/exp_return_val.s
+test_fun $src $dst
+
+src=$srcdir/initialize.c
+dst=$dstdir/initialize.s
+test_fun $src $dst
+
+src=$srcdir/missing_return.c
+dst=$dstdir/missing_return.s
+test_fun $src $dst
+
+src=$srcdir/multiple_vars.c
+dst=$dstdir/multiple_vars.s
+test_fun $src $dst
+
+src=$srcdir/no_initialize.c
+dst=$dstdir/no_initialize.s
+test_fun $src $dst
+
+src=$srcdir/refer.c
+dst=$dstdir/refer.s
+test_fun $src $dst
+
+src=$srcdir/unused_exp.c
+dst=$dstdir/unused_exp.s
 test_fun $src $dst

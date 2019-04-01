@@ -17,17 +17,13 @@ fn gen_fn_prologue() -> String {
     format!(
         "{}:\n\
          {}.cfi_startproc\n\
-         {}pushl	%ebp\n\
-         {}.cfi_def_cfa_offset 8\n\
-         {}.cfi_offset 5, -8\n\
-         {}movl	%esp, %ebp\n\
-         {}.cfi_def_cfa_register 5\n\
-         {}call	__x86.get_pc_thunk.ax\n\
-         {}addl	$_GLOBAL_OFFSET_TABLE_, %eax\n\
+         {}pushq	%rbp\n\
+         {}.cfi_def_cfa_offset 16\n\
+         {}.cfi_offset 6, -16\n\
+         {}movq	%rsp, %rbp\n\
+         {}.cfi_def_cfa_register 6\n\
          ",
         gen_labels("FB".to_string()),
-        p,
-        p,
         p,
         p,
         p,
@@ -41,40 +37,39 @@ fn gen_fn_epilogue() -> String {
     let p = "        ";
     format!(
         "\
-         {}popl	%ebp\n\
-         {}.cfi_restore 5\n\
-         {}.cfi_def_cfa 4, 4\n\
+         {}popq	%rbp\n\
+         {}.cfi_def_cfa 7, 8\n\
          ",
-        p, p, p
+        p, p
     )
 }
-pub fn gen_as(tree: &ParseNode) -> String {
+pub fn gen_prog(tree: &ParseNode) -> String {
     let p = "        ".to_string(); // 8 white spaces
     match &tree.entry {
         NodeType::Prog(prog_name) => format!(
-            ".code32\n\
-             {}.file \"{}\"\n\
+            "{}.file \"{}\"\n\
              {}\
-	           {}.section	.text.__x86.get_pc_thunk.ax,\"axG\",@progbits,__x86.get_pc_thunk.ax,comdat\n\
-	           {}.globl	__x86.get_pc_thunk.ax\n\
-	           {}.hidden	__x86.get_pc_thunk.ax\n\
-	           {}.type	__x86.get_pc_thunk.ax, @function\n\
-             __x86.get_pc_thunk.ax:\n\
-	           {}.cfi_startproc\n\
-	           {}movl	(%esp), %eax\n\
-	           {}ret\n\
-	           {}.cfi_endproc\n\
-	           {}.ident	\"crust: 0.1 (By Haoran Wang)\"\n\
-	           {}.section	.note.GNU-stack,\"\",@progbits\n\
+             {}.ident	\"crust: 0.1 (By Haoran Wang)\"\n\
+             {}.section	.note.GNU-stack,\"\",@progbits\n\
              ",
-            p, prog_name,
-            gen_as(tree.child.get(0).expect("Program node no child")),
-            p,p,p,p,p,p,p,p,p,p
+            p,
+            prog_name,
+            gen_fn(tree.child.get(0).expect("Program node no child")),
+            p,
+            p
         ),
+        _ => panic!("Not a program"),
+    }
+}
+pub fn gen_fn(tree: &ParseNode) -> String {
+    let p = "        ".to_string(); // 8 white spaces
+    match &tree.entry {
         NodeType::Fn(fn_name, _) => {
             let mut stmts = String::new();
+            let index_map: &mut HashMap<String, isize> = &mut HashMap::new();
+            let idx: &mut isize = &mut -8;
             for it in &tree.child {
-                stmts.push_str(&gen_as(&it));
+                stmts.push_str(&gen_as(&it, index_map, idx));
             }
             format!(
                 "{}.global {}\n\
@@ -100,17 +95,127 @@ pub fn gen_as(tree: &ParseNode) -> String {
                 fn_name
             )
         }
-        NodeType::Stmt(stmt_type::Return) => format!(
-            "{}\
-             {}\
-             {}ret\n",
-            gen_as(tree.child.get(0).expect("Statement node no child")),
-            gen_fn_epilogue(),
-            p
-        ),
-        NodeType::UnExp(Op) => gen_unexp(tree, Op),
-        NodeType::BinExp(Op) => gen_binexp(tree, Op),
-        NodeType::Const(n) => format!("{}movl ${}, %eax\n", p, n),
+        _ => panic!("Not a function node"),
+    }
+}
+pub fn gen_as(tree: &ParseNode, index_map: &mut HashMap<String, isize>, idx: &mut isize) -> String {
+    let p = "        ".to_string(); // 8 white spaces
+    match &tree.entry {
+        NodeType::Stmt(stmt) => {
+            match stmt {
+                stmt_type::Return => format!(
+                    "{}\
+                     {}\
+                     {}ret\n",
+                    gen_as(
+                        tree.child.get(0).expect("Statement node no child"),
+                        index_map,
+                        idx
+                    ),
+                    gen_fn_epilogue(),
+                    p
+                ),
+                stmt_type::Declare(var_name) => {
+                    /*
+                    if var_map.contains("a"):
+                    fail() //shouldn't declare a var twice
+                    generate_exp(expression)      // generate assembly to calculate e1 and move it to eax
+                    emit "    pushl %rax" // save initial value of "a" onto the stack
+                    var_map = var_map.put("a", stack_index) // record location of a in the variable map
+                    stack_index = stack_index - 4 // stack location of next address will be
+                    */
+                    match index_map.get(var_name) {
+                        Some(_) => panic!("Error: redeclaration of variable `{}`", var_name),
+                        None => {
+                            // Ok;
+                            let tmp_str = format!("{}", var_name);
+                            index_map.insert(tmp_str, *idx);
+                            *idx -= 8;
+                        }
+                    }
+                    // judge whether it's initialized
+                    let mut e1 = String::new();
+
+                    if tree.child.is_empty() {
+                        // just declare, we initialized it with 0
+                        e1 = format!("{}movq $0, %rax\n", p);
+                    } else {
+                        e1 = gen_as(
+                            tree.child
+                                .get(0)
+                                .expect("Statement::Declare Node has no child"),
+                            index_map,
+                            idx,
+                        )
+                    }
+                    let get_result = index_map.get(var_name);
+                    let mut va_offset: isize = -8;
+                    match get_result {
+                        Some(t) => {
+                            va_offset = *t;
+                        }
+                        None => panic!("Something went wrong in gen::gen_as()"),
+                    }
+                    format!(
+                        "{}\
+                         {}movq %rax, {}(%rbp)\n",
+                        e1, p, va_offset
+                    )
+                }
+                stmt_type::Exp => gen_as(
+                    tree.child.get(0).expect("Statement Node no child"),
+                    index_map,
+                    idx,
+                ),
+            }
+        }
+        NodeType::AssignNode(var_name) => {
+            match index_map.get(var_name) {
+                Some(t) => {
+                    // declared before, that's ok
+                    let e1 = gen_as(
+                        tree.child
+                            .get(0)
+                            .expect("Statement::Declare Node has no child"),
+                        index_map,
+                        idx,
+                    );
+                    let get_result = index_map.get(var_name);
+                    let mut va_offset: isize = -8;
+                    match get_result {
+                        Some(t) => {
+                            va_offset = *t;
+                        }
+                        None => panic!("Something went wrong in gen::gen_as()"),
+                    }
+                    format!(
+                        "{}\
+                         {}movq %rax, {}(%rbp)\n",
+                        e1, p, va_offset
+                    )
+                }
+                None => {
+                    // Not declared before, that's not ok
+                    panic!("Error: Use un-declared variable `{}`", var_name)
+                }
+            }
+        }
+        NodeType::UnExp(Op) => gen_unexp(tree, Op, index_map, idx),
+        NodeType::BinExp(Op) => gen_binexp(tree, Op, index_map, idx),
+        NodeType::Const(n) => format!("{}movq ${}, %rax\n", p, n),
+        NodeType::Var(var_name) => {
+            let var_offset = index_map.get(var_name);
+            match var_offset {
+                Some(t) => {
+                    let var_offset = t;
+                    format!("{}movq {}(%rbp), %rax\n", p, var_offset)
+                }
+                None => panic!(format!("Use of undeclared variable `{}`", var_name)),
+            }
+            //var_offset = var_map.find("a") //find location of variable "a" on the stack
+            //should fail if it hasn't been declared yet
+            //emit "    movq {}(%ebp), %rax".format(var_offset) //retrieve value of variable
+        }
         NodeType::EqualityExp
         | NodeType::RelationalExp
         | NodeType::Term
@@ -122,6 +227,8 @@ pub fn gen_as(tree: &ParseNode) -> String {
             tree.child
                 .get(0)
                 .expect(&format!("{:?} node no child", &tree.entry)),
+            index_map,
+            idx,
         ),
         _ => panic!(format!(
             "Node `{:?}` not implemented in gen::gen_as()\n",
@@ -130,27 +237,44 @@ pub fn gen_as(tree: &ParseNode) -> String {
     }
 }
 
-fn gen_unexp(tree: &ParseNode, Op: &TokType) -> String {
+fn gen_unexp(
+    tree: &ParseNode,
+    Op: &TokType,
+    index_map: &mut HashMap<String, isize>,
+    idx: &mut isize,
+) -> String {
     let p = "        ".to_string(); // 8 white spaces
     match Op {
         TokType::Minus => format!(
             "{}\
-             {}neg %eax\n",
-            gen_as(tree.child.get(0).expect("UnExp<-> no child")),
+             {}neg %rax\n",
+            gen_as(
+                tree.child.get(0).expect("UnExp<-> no child"),
+                index_map,
+                idx
+            ),
             p
         ),
         TokType::Tilde => format!(
             "{}\
-             {}not %eax\n",
-            gen_as(tree.child.get(0).expect("UnExp<~> no child")),
+             {}not %rax\n",
+            gen_as(
+                tree.child.get(0).expect("UnExp<~> no child"),
+                index_map,
+                idx
+            ),
             p
         ),
         TokType::Exclamation => format!(
             "{}\
-             {}cmp  $0, %eax\n\
-             {}movl $0, %eax\n\
+             {}cmp  $0, %rax\n\
+             {}movq $0, %rax\n\
              {}sete %al\n",
-            gen_as(tree.child.get(0).expect("UnExp<!> node no child")),
+            gen_as(
+                tree.child.get(0).expect("UnExp<!> node no child"),
+                index_map,
+                idx
+            ),
             p,
             p,
             p
@@ -164,72 +288,117 @@ fn gen_unexp(tree: &ParseNode, Op: &TokType) -> String {
     }
 }
 
-fn gen_binexp(tree: &ParseNode, Op: &TokType) -> String {
+fn gen_binexp(
+    tree: &ParseNode,
+    Op: &TokType,
+    index_map: &mut HashMap<String, isize>,
+    idx: &mut isize,
+) -> String {
     let p = "        ".to_string(); // 8 white spaces
     match Op {
         TokType::Plus => format!(
             "{}\
-             {}pushl %eax\n\
+             {}pushq %rax\n\
              {}\
-             {}popl %ecx\n\
-             {}addl %ecx, %eax\n",
-            gen_as(tree.child.get(0).expect("BinExp has no lhs")),
+             {}popq %rcx\n\
+             {}addq %rcx, %rax\n",
+            gen_as(
+                tree.child.get(0).expect("BinExp has no lhs"),
+                index_map,
+                idx
+            ),
             p,
-            gen_as(tree.child.get(1).expect("BinExp has no rhs")),
+            gen_as(
+                tree.child.get(1).expect("BinExp has no rhs"),
+                index_map,
+                idx
+            ),
             p,
             p
         ),
         TokType::Minus => format!(
             "{}\
-             {}pushl %eax\n\
+             {}pushq %rax\n\
              {}\
-             {}popl %ecx\n\
-             {}subl %ecx, %eax\n", // subl src, dst : dst - src -> dst
-            //   let %eax = dst = e1, %ecx = src = e2
-            gen_as(tree.child.get(1).expect("BinExp has no rhs")),
+             {}popq %rcx\n\
+             {}subq %rcx, %rax\n", // subl src, dst : dst - src -> dst
+            //   let %rax = dst = e1, %rcx = src = e2
+            gen_as(
+                tree.child.get(1).expect("BinExp has no rhs"),
+                index_map,
+                idx
+            ),
             p,
-            gen_as(tree.child.get(0).expect("BinExp has no lhs")),
+            gen_as(
+                tree.child.get(0).expect("BinExp has no lhs"),
+                index_map,
+                idx
+            ),
             p,
             p
         ),
         TokType::Multi => format!(
             "{}\
-             {}pushl %eax\n\
+             {}pushq %rax\n\
              {}\
-             {}popl %ecx\n\
-             {}imul %ecx, %eax\n",
-            gen_as(tree.child.get(0).expect("BinExp has no lhs")),
+             {}popq %rcx\n\
+             {}imul %rcx, %rax\n",
+            gen_as(
+                tree.child.get(0).expect("BinExp has no lhs"),
+                index_map,
+                idx
+            ),
             p,
-            gen_as(tree.child.get(1).expect("BinExp has no rhs")),
+            gen_as(
+                tree.child.get(1).expect("BinExp has no rhs"),
+                index_map,
+                idx
+            ),
             p,
             p
         ),
         TokType::Splash => format!(
             "{}\
-             {}pushl %eax\n\
+             {}pushq %rax\n\
              {}\
-             {}popl %ecx\n\
-             {}xorl %edx, %edx\n\
-             {}idivl %ecx\n",
+             {}popq %rcx\n\
+             {}xorq %rdx, %rdx\n\
+             {}idivq %rcx\n",
             // let eax = e1, edx = 0, ecx = e2
-            gen_as(tree.child.get(1).expect("BinExp has no rhs")),
+            gen_as(
+                tree.child.get(1).expect("BinExp has no rhs"),
+                index_map,
+                idx
+            ),
             p,
-            gen_as(tree.child.get(0).expect("BinExp has no lhs")),
+            gen_as(
+                tree.child.get(0).expect("BinExp has no lhs"),
+                index_map,
+                idx
+            ),
             p,
             p,
             p
         ),
         TokType::Equal => format!(
             "{}\
-             {}pushl %eax\n\
+             {}pushq %rax\n\
              {}\
-             {}popl %ecx\n\
-             {}cmpl %eax, %ecx # set ZF on if %eax == %ecx, set it off otherwise\n\
-             {}movl $0, %eax   # zero out EAX, does not change flag\n\
+             {}popq %rcx\n\
+             {}cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise\n\
+             {}movq $0, %rax   # zero out EAX, does not change flag\n\
              {}sete %al\n",
-            gen_as(tree.child.get(0).expect("BinExp<==> node no child")),
+            gen_as(
+                tree.child.get(0).expect("BinExp<==> node no child"),
+                index_map,
+                idx
+            ),
             p,
-            gen_as(tree.child.get(1).expect("BinExp<==> node no child")),
+            gen_as(
+                tree.child.get(1).expect("BinExp<==> node no child"),
+                index_map,
+                idx
+            ),
             p,
             p,
             p,
@@ -237,15 +406,23 @@ fn gen_binexp(tree: &ParseNode, Op: &TokType) -> String {
         ),
         TokType::NotEqual => format!(
             "{}\
-             {}pushl %eax\n\
+             {}pushq %rax\n\
              {}\
-             {}popl %ecx\n\
-             {}cmpl %eax, %ecx # set ZF on if %eax == %ecx, set it off otherwise\n\
-             {}movl $0, %eax   # zero out EAX, does not change flag\n\
+             {}popq %rcx\n\
+             {}cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise\n\
+             {}movq $0, %rax   # zero out EAX, does not change flag\n\
              {}setne %al\n",
-            gen_as(tree.child.get(0).expect("BinExp<==> node no child")),
+            gen_as(
+                tree.child.get(0).expect("BinExp<==> node no child"),
+                index_map,
+                idx
+            ),
             p,
-            gen_as(tree.child.get(1).expect("BinExp<==> node no child")),
+            gen_as(
+                tree.child.get(1).expect("BinExp<==> node no child"),
+                index_map,
+                idx
+            ),
             p,
             p,
             p,
@@ -253,15 +430,23 @@ fn gen_binexp(tree: &ParseNode, Op: &TokType) -> String {
         ),
         TokType::LessEqual => format!(
             "{}\
-             {}pushl %eax\n\
+             {}pushq %rax\n\
              {}\
-             {}popl %ecx\n\
-             {}cmpl %eax, %ecx # set ZF on if %eax == %ecx, set it off otherwise\n\
-             {}movl $0, %eax   # zero out EAX, does not change flag\n\
+             {}popq %rcx\n\
+             {}cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise\n\
+             {}movq $0, %rax   # zero out EAX, does not change flag\n\
              {}setle %al\n",
-            gen_as(tree.child.get(0).expect("BinExp<==> node no child")),
+            gen_as(
+                tree.child.get(0).expect("BinExp<==> node no child"),
+                index_map,
+                idx
+            ),
             p,
-            gen_as(tree.child.get(1).expect("BinExp<==> node no child")),
+            gen_as(
+                tree.child.get(1).expect("BinExp<==> node no child"),
+                index_map,
+                idx
+            ),
             p,
             p,
             p,
@@ -269,15 +454,23 @@ fn gen_binexp(tree: &ParseNode, Op: &TokType) -> String {
         ),
         TokType::GreaterEqual => format!(
             "{}\
-             {}pushl %eax\n\
+             {}pushq %rax\n\
              {}\
-             {}popl %ecx\n\
-             {}cmpl %eax, %ecx # set ZF on if %eax == %ecx, set it off otherwise\n\
-             {}movl $0, %eax   # zero out EAX, does not change flag\n\
+             {}popq %rcx\n\
+             {}cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise\n\
+             {}movq $0, %rax   # zero out EAX, does not change flag\n\
              {}setge %al\n",
-            gen_as(tree.child.get(0).expect("BinExp<==> node no child")),
+            gen_as(
+                tree.child.get(0).expect("BinExp<==> node no child"),
+                index_map,
+                idx
+            ),
             p,
-            gen_as(tree.child.get(1).expect("BinExp<==> node no child")),
+            gen_as(
+                tree.child.get(1).expect("BinExp<==> node no child"),
+                index_map,
+                idx
+            ),
             p,
             p,
             p,
@@ -288,17 +481,21 @@ fn gen_binexp(tree: &ParseNode, Op: &TokType) -> String {
             let end_label = gen_labels(format!("END"));
             format!(
                 "{}\
-                 {}cmpl $0, %eax\n\
+                 {}cmpq $0, %rax\n\
                  {}je {}\n\
-                 {}movl $1, %eax\n\
+                 {}movq $1, %rax\n\
                  {}jmp {}\n\
                  {}:\n\
                  {}\
-                 {}cmpl $0, %eax\n\
-                 {}movl $0, %eax\n\
+                 {}cmpq $0, %rax\n\
+                 {}movq $0, %rax\n\
                  {}setne %al\n\
                  {}: # end of clause here\n",
-                gen_as(tree.child.get(0).expect("BinExp<||> node no child")),
+                gen_as(
+                    tree.child.get(0).expect("BinExp<||> node no child"),
+                    index_map,
+                    idx
+                ),
                 p,
                 p,
                 clause2_label,
@@ -306,7 +503,11 @@ fn gen_binexp(tree: &ParseNode, Op: &TokType) -> String {
                 p,
                 end_label,
                 clause2_label,
-                gen_as(tree.child.get(1).expect("BinExp<||> node no child")),
+                gen_as(
+                    tree.child.get(1).expect("BinExp<||> node no child"),
+                    index_map,
+                    idx
+                ),
                 p,
                 p,
                 p,
@@ -318,23 +519,31 @@ fn gen_binexp(tree: &ParseNode, Op: &TokType) -> String {
             let end_label = gen_labels(format!("end"));
             format!(
                 "{}\
-                 {}cmpl $0, %eax\n\
+                 {}cmpq $0, %rax\n\
                  {}jne {}\n\
                  {}jmp {}\n\
                  {}:\n\
                  {}\
-                 {}cmpl $0, %eax\n\
-                 {}movl $0, %eax\n\
+                 {}cmpq $0, %rax\n\
+                 {}movq $0, %rax\n\
                  {}setne %al\n\
                  {}: # end of clause here\n",
-                gen_as(tree.child.get(0).expect("BinExp<||> node no child")),
+                gen_as(
+                    tree.child.get(0).expect("BinExp<||> node no child"),
+                    index_map,
+                    idx
+                ),
                 p,
                 p,
                 clause2_label,
                 p,
                 end_label,
                 clause2_label,
-                gen_as(tree.child.get(1).expect("BinExp<||> node no child")),
+                gen_as(
+                    tree.child.get(1).expect("BinExp<||> node no child"),
+                    index_map,
+                    idx
+                ),
                 p,
                 p,
                 p,
@@ -343,15 +552,23 @@ fn gen_binexp(tree: &ParseNode, Op: &TokType) -> String {
         }
         TokType::Lt => format!(
             "{}\
-             {}pushl %eax\n\
+             {}pushq %rax\n\
              {}\
-             {}popl %ecx\n\
-             {}cmpl %eax, %ecx # set ZF on if %eax == %ecx, set it off otherwise\n\
-             {}movl $0, %eax   # zero out EAX, does not change flag\n\
+             {}popq %rcx\n\
+             {}cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise\n\
+             {}movq $0, %rax   # zero out EAX, does not change flag\n\
              {}setl %al\n",
-            gen_as(tree.child.get(0).expect("BinExp<==> node no child")),
+            gen_as(
+                tree.child.get(0).expect("BinExp<==> node no child"),
+                index_map,
+                idx
+            ),
             p,
-            gen_as(tree.child.get(1).expect("BinExp<==> node no child")),
+            gen_as(
+                tree.child.get(1).expect("BinExp<==> node no child"),
+                index_map,
+                idx
+            ),
             p,
             p,
             p,
@@ -359,15 +576,23 @@ fn gen_binexp(tree: &ParseNode, Op: &TokType) -> String {
         ),
         TokType::Gt => format!(
             "{}\
-             {}pushl %eax\n\
+             {}pushq %rax\n\
              {}\
-             {}popl %ecx\n\
-             {}cmpl %eax, %ecx # set ZF on if %eax == %ecx, set it off otherwise\n\
-             {}movl $0, %eax   # zero out EAX, does not change flag\n\
+             {}popq %rcx\n\
+             {}cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise\n\
+             {}movq $0, %rax   # zero out EAX, does not change flag\n\
              {}setg %al\n",
-            gen_as(tree.child.get(0).expect("BinExp<==> node no child")),
+            gen_as(
+                tree.child.get(0).expect("BinExp<==> node no child"),
+                index_map,
+                idx
+            ),
             p,
-            gen_as(tree.child.get(1).expect("BinExp<==> node no child")),
+            gen_as(
+                tree.child.get(1).expect("BinExp<==> node no child"),
+                index_map,
+                idx
+            ),
             p,
             p,
             p,

@@ -13,7 +13,7 @@ pub enum NodeType {
     Stmt(stmt_type),
     Const(i64),
     Var(String),
-    AssignNode(String), // String -> variable name
+    AssignNode(String),     // String -> variable name
     UnExp(lexer::TokType),  // Unary Expression
     BinExp(lexer::TokType), // Binary Operator
     Exp,                    // <exp> ::= <id> "=" <exp> | <logical-or-exp>
@@ -26,7 +26,6 @@ pub enum NodeType {
     Factor,        // <factor> ::= "(" <exp> ")" | <unary_op> <factor> | <int> | <id>
 }
 
-#[repr(C)]
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum stmt_type {
     Return,
@@ -89,7 +88,7 @@ fn p_logical_or_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode
 }
 
 fn p_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
-    println!("in fn: p_exp, wiit pos:{}", pos);
+    //println!("in fn: p_exp, wiit pos:{}", pos);
     // <exp> ::= <id> "=" <exp> | <logical-or-exp>
     let mut exp_node = ParseNode::new();
     exp_node.entry = NodeType::Exp;
@@ -190,7 +189,7 @@ fn p_fn(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), St
 }
 
 fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
-    println!("in fn : p_stmt, with pos {}", pos);
+    // println!("in fn : p_stmt, with pos {}", pos);
     let tok = &toks[pos];
     match tok {
         lexer::TokType::Kwd(lexer::KwdType::Ret) => {
@@ -277,25 +276,6 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
             return Ok((stmt_node, pos));
         }
     }
-    // if *tok != lexer::TokType::Kwd(lexer::KwdType::Ret) {
-    //     return Err(format!(
-    //         "Expected `return`, found {:?} at {}",
-    //         toks[pos], pos
-    //     ));
-    // }
-    //     let pos = pos + 1;
-    //     let (exp_node, mut pos) = r#try!(p_exp(toks, pos));
-
-    //     let tok = &toks[pos];
-    //     if *tok != lexer::TokType::Semicolon {
-    //         return Err(format!("Expected `;`, found {:?} at {}", toks[pos], pos));
-    //     }
-    //     pos = pos + 1;
-
-    //     let mut stmt_node = ParseNode::new();
-    //     stmt_node.entry = NodeType::Stmt(stmt_type::Return);
-    //     stmt_node.child.push(exp_node);
-    //     Ok((stmt_node, pos))
 }
 
 fn p_factor(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
@@ -460,7 +440,7 @@ fn p_relational_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode
     while *tok == lexer::TokType::Lt
         || *tok == lexer::TokType::Gt
         || *tok == lexer::TokType::GreaterEqual
-        || *tok == lexer::TokType::LessEqual
+        || *tok == lexer::TokType::LessEqual
     {
         let mut binexp_node = ParseNode::new();
         binexp_node.entry = NodeType::BinExp(match tok {
@@ -528,7 +508,7 @@ fn p_term(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
 fn p_additive_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
     // println!("in p_exp with pos: {}", pos);
     let mut exp_node = ParseNode::new();
-    exp_node.entry = NodeType::Exp;
+    exp_node.entry = NodeType::AdditiveExp;
     /// exp -> term
     let mut pos = pos;
     let (term_node, tmp_pos) = r#try!(p_term(toks, pos));
@@ -602,7 +582,7 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
             var_name,
             print(
                 tree.child.get(0).expect("Assign Node has no child"),
-                idt+1
+                idt + 1
             ),
             idt_prefix
         ),
