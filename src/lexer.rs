@@ -129,7 +129,7 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
                             it.next();
                             result.push(TokType::LessEqual);
                             it.next();
-                    }
+                        }
                         _ => {
                             result.push(TokType::Lt);
                             it.next();
