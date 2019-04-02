@@ -5,10 +5,16 @@ use std::collections::HashMap;
 // generate a std::String contains the assembly language code
 static mut LABEL_COUNTER: i64 = -1;
 fn gen_labels(prefix: String) -> String {
-    // XXX: should improve it, now just produce some thing like `_label.1` `_label.2`
     unsafe {
         LABEL_COUNTER = LABEL_COUNTER + 1;
         return format!(".L{}{}", prefix, LABEL_COUNTER);
+    }
+}
+
+static mut FLAG_FOR_MAIN_HAS_RET: bool = false;
+fn fn_main_has_ret() {
+    unsafe {
+        FLAG_FOR_MAIN_HAS_RET = true;
     }
 }
 
@@ -65,16 +71,27 @@ pub fn gen_fn(tree: &ParseNode) -> String {
     let p = "        ".to_string(); // 8 white spaces
     match &tree.entry {
         NodeType::Fn(fn_name, _) => {
+            // if this function is main, evan without a return val, we should add return 0 before leave main function
             let mut stmts = String::new();
             let index_map: &mut HashMap<String, isize> = &mut HashMap::new();
             let idx: &mut isize = &mut -8;
             for it in &tree.child {
+                if fn_name == "main" && it.entry == NodeType::Stmt(stmt_type::Return) {
+                    fn_main_has_ret();
+                }
                 stmts.push_str(&gen_as(&it, index_map, idx));
             }
+            // let mut make_sure_main_has_ret = "";
+            // unsafe {
+            //     if FLAG_FOR_MAIN_HAS_RET == false {
+            //         make_sure_main_has_ret = &"        movq $0, %rax\n        ret".to_string();
+            //     }
+            // }
             format!(
                 "{}.global {}\n\
                  {}.type {}, @function\n\
                  {}:\n\
+                 {}\
                  {}\
                  {}\
                  {}.cfi_endproc\n\
@@ -88,6 +105,13 @@ pub fn gen_fn(tree: &ParseNode) -> String {
                 fn_name,
                 gen_fn_prologue(),
                 stmts,
+                unsafe {
+                    if FLAG_FOR_MAIN_HAS_RET == false {
+                        "        movq $0, %rax\n        ret\n"
+                    } else {
+                        ""
+                    }
+                },
                 p,
                 gen_labels("FE".to_string()),
                 p,
@@ -116,14 +140,6 @@ pub fn gen_as(tree: &ParseNode, index_map: &mut HashMap<String, isize>, idx: &mu
                     p
                 ),
                 stmt_type::Declare(var_name) => {
-                    /*
-                    if var_map.contains("a"):
-                    fail() //shouldn't declare a var twice
-                    generate_exp(expression)      // generate assembly to calculate e1 and move it to eax
-                    emit "    pushl %rax" // save initial value of "a" onto the stack
-                    var_map = var_map.put("a", stack_index) // record location of a in the variable map
-                    stack_index = stack_index - 4 // stack location of next address will be
-                    */
                     match index_map.get(var_name) {
                         Some(_) => panic!("Error: redeclaration of variable `{}`", var_name),
                         None => {
@@ -212,9 +228,6 @@ pub fn gen_as(tree: &ParseNode, index_map: &mut HashMap<String, isize>, idx: &mu
                 }
                 None => panic!(format!("Use of undeclared variable `{}`", var_name)),
             }
-            //var_offset = var_map.find("a") //find location of variable "a" on the stack
-            //should fail if it hasn't been declared yet
-            //emit "    movq {}(%ebp), %rax".format(var_offset) //retrieve value of variable
         }
         NodeType::EqualityExp
         | NodeType::RelationalExp
