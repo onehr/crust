@@ -1,2 +1,6 @@
 /target
 **/*.rs.bk
+gen/
+*.s
+a.out
+b.out
