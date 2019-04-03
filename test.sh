@@ -1,6 +1,5 @@
 #!/bin/bash
 # build the project
-cargo fmt
 cargo build
 rm gen/*.s
 
@@ -24,9 +23,9 @@ test_fun() {
     echo "TEST $inc: [$1] -> [$2]"
     echo "crustRet: $a gccRet: $b"
     if [ "$a" -eq "$b" ]; then
-        echo -e "${BLUE}[Passed]${NC}"
+        echo -e "[${BLUE}Passed${NC}]"
     else
-        echo -e "[Error]"
+        echo -e "[${RED}Error${NC}]"
         exit 1
     fi
 }
@@ -237,12 +236,12 @@ src=$srcdir/initialize.c
 dst=$dstdir/initialize.s
 test_fun $src $dst
 
-echo -e "[${RED}Skip${NC}] test/valid/missing_return.c"
-echo "(runs normal locally, but will get segmentation fault in travis, comment it first)"
-echo ""
-# src=$srcdir/missing_return.c
-# dst=$dstdir/missing_return.s
-# test_fun $src $dst
+# echo -e "[${RED}Skip${NC}] test/valid/missing_return.c"
+# echo "(runs normal locally, but will get segmentation fault in travis, comment it first)"
+# echo ""
+src=$srcdir/missing_return.c
+dst=$dstdir/missing_return.s
+test_fun $src $dst
 
 src=$srcdir/multiple_vars.c
 dst=$dstdir/multiple_vars.s
@@ -259,3 +258,76 @@ test_fun $src $dst
 src=$srcdir/unused_exp.c
 dst=$dstdir/unused_exp.s
 test_fun $src $dst
+src=$srcdir/complicated_exp.c
+dst=$dstdir/complicated_exp.s
+test_fun $src $dst
+
+src=$srcdir/assign_ternary.c
+dst=$dstdir/assign_ternary.s
+test_fun $src $dst
+
+src=$srcdir/multiple_ternary.c
+dst=$dstdir/multiple_ternary.s
+test_fun $src $dst
+
+src=$srcdir/nested_ternary.c
+dst=$dstdir/nested_ternary.s
+test_fun $src $dst
+
+src=$srcdir/nested_ternary_2.c
+dst=$dstdir/nested_ternary_2.s
+test_fun $src $dst
+
+src=$srcdir/rh_assignment.c
+dst=$dstdir/rh_assignment.s
+test_fun $src $dst
+
+src=$srcdir/ternary.c
+dst=$dstdir/ternary.s
+test_fun $src $dst
+
+src=$srcdir/ternary_short_circuit.c
+dst=$dstdir/ternary_short_circuit.s
+test_fun $src $dst
+
+src=$srcdir/ternary_short_circuit_2.c
+dst=$dstdir/ternary_short_circuit_2.s
+test_fun $src $dst
+
+src=$srcdir/else.c
+dst=$dstdir/else.s
+test_fun $src $dst
+
+src=$srcdir/if_nested.c
+dst=$dstdir/if_nested.s
+test_fun $src $dst
+
+src=$srcdir/if_nested_2.c
+dst=$dstdir/if_nested_2.s
+test_fun $src $dst
+
+src=$srcdir/if_nested_3.c
+dst=$dstdir/if_nested_3.s
+test_fun $src $dst
+
+src=$srcdir/if_nested_4.c
+dst=$dstdir/if_nested_4.s
+test_fun $src $dst
+
+src=$srcdir/if_nested_5.c
+dst=$dstdir/if_nested_5.s
+test_fun $src $dst
+
+src=$srcdir/if_not_taken.c
+dst=$dstdir/if_not_taken.s
+test_fun $src $dst
+
+src=$srcdir/if_taken.c
+dst=$dstdir/if_taken.s
+test_fun $src $dst
+
+src=$srcdir/multiple_if.c
+dst=$dstdir/multiple_if.s
+test_fun $src $dst
+
+

@@ -34,6 +34,8 @@ pub enum TokType {
     NotEqual,           // !=
     LessEqual,          // <=
     GreaterEqual,       // >=
+    Colon,              // :
+    QuestionMark,       // ?
 }
 
 pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
@@ -220,6 +222,14 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
                     },
                     _ => return Err(format!("Can not peek next char")),
                 }
+            }
+            '?' => {
+                result.push(TokType::QuestionMark);
+                it.next();
+            }
+            ':' => {
+                result.push(TokType::Colon);
+                it.next();
             }
             ' ' | '\n' | '\t' | '\r' => {
                 // skip

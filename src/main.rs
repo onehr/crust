@@ -18,7 +18,6 @@ fn main() -> Result<(), String> {
 
     let c_src_name = &args[1];
     let s_src_name = &args[2];
-
     let contents = fs::read_to_string(c_src_name).expect("Can't read file");
     // println!("--------------------------------");
     // println!("SOURCE_FILE: [{}]", c_src_name);

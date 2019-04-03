@@ -42,11 +42,11 @@ fn gen_fn_prologue() -> String {
 fn gen_fn_epilogue() -> String {
     let p = "        ";
     format!(
-        "\
+        "{}movq %rbp, %rsp\n\
          {}popq	%rbp\n\
          {}.cfi_def_cfa 7, 8\n\
          ",
-        p, p
+        p, p, p
     )
 }
 pub fn gen_prog(tree: &ParseNode) -> String {
@@ -71,7 +71,8 @@ pub fn gen_fn(tree: &ParseNode) -> String {
     let p = "        ".to_string(); // 8 white spaces
     match &tree.entry {
         NodeType::Fn(fn_name, _) => {
-            // if this function is main, evan without a return val, we should add return 0 before leave main function
+            // if this function is main,
+            // evan without a return val, we should add return 0 before leave main function
             let mut stmts = String::new();
             let index_map: &mut HashMap<String, isize> = &mut HashMap::new();
             let idx: &mut isize = &mut -8;
@@ -81,12 +82,6 @@ pub fn gen_fn(tree: &ParseNode) -> String {
                 }
                 stmts.push_str(&gen_as(&it, index_map, idx));
             }
-            // let mut make_sure_main_has_ret = "";
-            // unsafe {
-            //     if FLAG_FOR_MAIN_HAS_RET == false {
-            //         make_sure_main_has_ret = &"        movq $0, %rax\n        ret".to_string();
-            //     }
-            // }
             format!(
                 "{}.global {}\n\
                  {}.type {}, @function\n\
@@ -107,9 +102,16 @@ pub fn gen_fn(tree: &ParseNode) -> String {
                 stmts,
                 unsafe {
                     if FLAG_FOR_MAIN_HAS_RET == false {
-                        "        movq $0, %rax\n        ret\n"
+                        format!(
+                            "{}movq $0, %rax\n\
+                             {}\
+                             {}ret\n",
+                            p,
+                            gen_fn_epilogue(),
+                            p
+                        )
                     } else {
-                        ""
+                        "".to_string()
                     }
                 },
                 p,
@@ -125,66 +127,135 @@ pub fn gen_fn(tree: &ParseNode) -> String {
 pub fn gen_as(tree: &ParseNode, index_map: &mut HashMap<String, isize>, idx: &mut isize) -> String {
     let p = "        ".to_string(); // 8 white spaces
     match &tree.entry {
-        NodeType::Stmt(stmt) => {
-            match stmt {
-                stmt_type::Return => format!(
-                    "{}\
-                     {}\
-                     {}ret\n",
-                    gen_as(
-                        tree.child.get(0).expect("Statement node no child"),
-                        index_map,
-                        idx
-                    ),
-                    gen_fn_epilogue(),
-                    p
-                ),
-                stmt_type::Declare(var_name) => {
-                    match index_map.get(var_name) {
-                        Some(_) => panic!("Error: redeclaration of variable `{}`", var_name),
-                        None => {
-                            // Ok;
-                            let tmp_str = format!("{}", var_name);
-                            index_map.insert(tmp_str, *idx);
-                            *idx -= 8;
-                        }
-                    }
-                    // judge whether it's initialized
-                    let mut e1 = String::new();
-
-                    if tree.child.is_empty() {
-                        // just declare, we initialized it with 0
-                        e1 = format!("{}movq $0, %rax\n", p);
-                    } else {
-                        e1 = gen_as(
-                            tree.child
-                                .get(0)
-                                .expect("Statement::Declare Node has no child"),
-                            index_map,
-                            idx,
-                        )
-                    }
-                    let get_result = index_map.get(var_name);
-                    let mut va_offset: isize = -8;
-                    match get_result {
-                        Some(t) => {
-                            va_offset = *t;
-                        }
-                        None => panic!("Something went wrong in gen::gen_as()"),
-                    }
-                    format!(
-                        "{}\
-                         {}movq %rax, {}(%rbp)\n",
-                        e1, p, va_offset
-                    )
-                }
-                stmt_type::Exp => gen_as(
-                    tree.child.get(0).expect("Statement Node no child"),
+        NodeType::ConditionalExp => {
+            if tree.child.len() == 1 {
+                // just one <logical-or-exp>
+                gen_as(
+                    tree.child
+                        .get(0)
+                        .expect("Conditional Expression has no child"),
                     index_map,
                     idx,
-                ),
+                )
+            } else if tree.child.len() == 3 {
+                // <logical-or-exp> "?" <exp> ":" <conditional-exp>
+                let e1_as = gen_as(
+                    tree.child.get(0).expect("Conditional expression no e1"),
+                    index_map,
+                    idx,
+                );
+                let e2_as = gen_as(
+                    tree.child.get(1).expect("conditional expression no e2"),
+                    index_map,
+                    idx,
+                );
+                let e3_as = gen_as(
+                    tree.child.get(2).expect("conditional expression no e3"),
+                    index_map,
+                    idx,
+                );
+
+                let label_e3 = gen_labels(format!("E3"));
+                let label_end = gen_labels(format!("ENDCOND"));
+                format!(
+                    "{}\
+                     {}cmpq $0, %rax\n\
+                     {}je {}\n\
+                     {}\
+                     {}jmp {}\n\
+                     {}:\n\
+                     {}\
+                     {}:\n",
+                    e1_as, p, p, label_e3, e2_as, p, label_end, label_e3, e3_as, label_end,
+                )
+            } else {
+                panic!("Error: something wrong in conditional expression")
             }
         }
+        NodeType::Declare(var_name) => {
+            match index_map.get(var_name) {
+                Some(_) => panic!("Error: redeclaration of variable `{}`", var_name),
+                None => {
+                    // Ok;
+                    let tmp_str = format!("{}", var_name);
+                    index_map.insert(tmp_str, *idx);
+                    *idx -= 8;
+                }
+            }
+            // judge whether it's initialized
+            let mut e1 = String::new();
+
+            if tree.child.is_empty() {
+                // just declare, we initialized it with 0
+                e1 = format!("{}movq $0, %rax\n", p);
+            } else {
+                e1 = gen_as(
+                    tree.child
+                        .get(0)
+                        .expect("Statement::Declare Node has no child"),
+                    index_map,
+                    idx,
+                )
+            }
+            format!(
+                "{}\
+                 {}pushq %rax\n",
+                e1, p
+            )
+        }
+        NodeType::Stmt(stmt) => match stmt {
+            stmt_type::Return => format!(
+                "{}\
+                 {}\
+                 {}ret\n",
+                gen_as(
+                    tree.child.get(0).expect("Statement node no child"),
+                    index_map,
+                    idx
+                ),
+                gen_fn_epilogue(),
+                p
+            ),
+            stmt_type::Conditional(_) => {
+                let e1_as = gen_as(
+                    tree.child.get(0).expect("Conditional node no e1"),
+                    index_map,
+                    idx,
+                );
+                let s1_as = gen_as(
+                    tree.child.get(1).expect("conditional node no s1"),
+                    index_map,
+                    idx,
+                );
+                let s2_as: String = if tree.child.len() == 2 {
+                    "".to_string()
+                } else {
+                    gen_as(
+                        tree.child.get(2).expect("conditional node no s2"),
+                        index_map,
+                        idx,
+                    )
+                };
+                let label_s2 = gen_labels(format!("S2"));
+                let label_end = gen_labels(format!("ENDIF"));
+                format!(
+                    "{}\
+                     {}cmpq $0, %rax\n\
+                     {}je {}\n\
+                     {}\
+                     {}jmp {}\n\
+                     {}:\n\
+                     {}\
+                     {}:\n",
+                    e1_as, p, p, label_s2, s1_as, p, label_end, label_s2, s2_as, label_end,
+                )
+            }
+            stmt_type::Exp => gen_as(
+                tree.child.get(0).expect("Statement Node no child"),
+                index_map,
+                idx,
+            ),
+        },
         NodeType::AssignNode(var_name) => {
             match index_map.get(var_name) {
                 Some(t) => {
@@ -236,6 +307,7 @@ pub fn gen_as(tree: &ParseNode, index_map: &mut HashMap<String, isize>, idx: &mu
         | NodeType::Factor
         | NodeType::AdditiveExp
         | NodeType::LogicalOrExp
+        | NodeType::Block
         | NodeType::LogicalAndExp => gen_as(
             tree.child
                 .get(0)
