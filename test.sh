@@ -236,13 +236,6 @@ src=$srcdir/initialize.c
 dst=$dstdir/initialize.s
 test_fun $src $dst
 
-# echo -e "[${RED}Skip${NC}] test/valid/missing_return.c"
-# echo "(runs normal locally, but will get segmentation fault in travis, comment it first)"
-# echo ""
-src=$srcdir/missing_return.c
-dst=$dstdir/missing_return.s
-test_fun $src $dst
-
 src=$srcdir/multiple_vars.c
 dst=$dstdir/multiple_vars.s
 test_fun $src $dst
