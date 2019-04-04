@@ -1,10 +1,10 @@
 # CRUST
 [![Build Status](https://travis-ci.com/onehr/crust.svg?branch=master)](https://travis-ci.com/onehr/crust)
 
-A simple C compiler (do not contain assembler) written in Rust-lang.
+A simple C compiler written in Rust-lang.
 
 ## Project Goal
-Support C89 Standard, generate X86_64 Assembly Code from C source code.
+Support C11 Standard, generate X86_64 Assembly Code from C source code.
 
 PS. Now this compiler is in his bare-metal stage, using it to develop was like using a stick to face the dragon.
 But I will keep developing it until it can compile real-world applications.
