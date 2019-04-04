@@ -14,6 +14,7 @@ Support C89 Standard, generate X86_64 Assembly Code from C source code.
 4. Binary Operator: `||`, `&&`, `<`, `>`, `>=`, `<=`, `==`, `+`, `-`, `/`, `*`
 5. Now only support int data type.
 6. Support `if` `else`, and `exp1 ? exp2 : exp3`
+7. Support local scope binding now.
 
 ## Usage
 Cause now it's just in bare-metal development stage, so now it only supports little features.
@@ -105,6 +106,52 @@ main:
         .cfi_endproc
 .LFE3:
         .size	main, .-main
+        .ident	"crust: 0.1 (By Haoran Wang)"
+        .section	.note.GNU-stack,"",@progbits
+```
+* now suport local scope
+```c
+int main() {
+int a = 1; {int a = 2; {int a = 3; {int a = 4;}}}
+return a;
+}
+```
+generated assembly file:
+```assembly
+        .file "tmp.c"
+        .global main
+        .type main, @function
+main:
+.LFB0:
+        .cfi_startproc
+        pushq	%rbp
+        .cfi_def_cfa_offset 16
+        .cfi_offset 6, -16
+        movq	%rsp, %rbp
+        .cfi_def_cfa_register 6
+        movq $1, %rax
+        pushq %rax
+        movq $2, %rax
+        pushq %rax
+        movq $3, %rax
+        pushq %rax
+        movq $4, %rax
+        pushq %rax
+        addq $8, %rsp
+        addq $8, %rsp
+        addq $8, %rsp
+        movq -8(%rbp), %rax
+        movq %rbp, %rsp
+        popq	%rbp
+        .cfi_def_cfa 7, 8
+        ret
+        addq $8, %rsp
+        movq %rbp, %rsp
+        popq	%rbp
+        .cfi_def_cfa 7, 8
+        .cfi_endproc
+.LFE1:
+        .size   main, .-main
         .ident	"crust: 0.1 (By Haoran Wang)"
         .section	.note.GNU-stack,"",@progbits
 ```
