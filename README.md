@@ -6,6 +6,10 @@ A simple C compiler (do not contain assembler) written in Rust-lang.
 ## Project Goal
 Support C89 Standard, generate X86_64 Assembly Code from C source code.
 
+PS. Now this compiler is in his bare-metal stage, using it to develop was like using a stick to face the dragon.
+But I will keep developing it until it can compile real-world applications.
+Now I will mainly focus on how to use Rust and build the basic structures.
+
 ## Now Support
 **Cause now it's in development, so it only supports little features in C**.
 1. Local Variables declaration and assignment
