@@ -4,10 +4,11 @@ use crate::lexer;
 pub enum NodeType {
     Prog(String),
     Fn(String, Option<Box<NodeType>>), // <function> ::= "int" <id> "(" ")" "{" {<block-item>} "}"
-    Stmt(stmt_type),
+    Stmt(StmtType),
     // <statement> ::= "return" <exp> ";"
     //               | <exp> ;
     //               | "if" "(" <exp> ")" <statement> [ "else" <statement> ]
+    //               | "{" { <block-item> } "}"
     Block, // <block> ::= <statement> | <declaration>
     Const(i64),
     Var(String),
@@ -27,10 +28,11 @@ pub enum NodeType {
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
-pub enum stmt_type {
+pub enum StmtType {
     Return,
     Exp,
     Conditional(String),
+    Compound,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -86,6 +88,7 @@ fn p_logical_or_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode
     pos = pos - 1;
     return Ok((log_or_exp_node, pos));
 }
+
 fn p_conditional_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
     // <conditional-exp> ::= <logical-or-exp> [ "?" <exp> ":" <conditional-exp> ]
     let mut conditional_exp_node = ParseNode::new();
@@ -116,6 +119,7 @@ fn p_conditional_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNod
         return Ok((conditional_exp_node, pos));
     }
 }
+
 fn p_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
     // println!("in fn: p_exp, with pos:{}", pos);
     // <exp> ::= <id> "=" <exp> | <conditional-exp>
@@ -150,6 +154,7 @@ fn p_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), S
         }
     }
 }
+
 // TODO: now only support one function: which is main
 fn p_fn(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
     // println!("in p_fn with pos: {}", pos);
@@ -196,16 +201,17 @@ fn p_fn(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), St
 
     let mut fn_node = ParseNode::new();
     fn_node.entry = NodeType::Fn(fn_name, None);
-    let mut tok = &toks[pos];
-    while *tok != lexer::TokType::RBrace {
+
+    while pos < toks.len() && toks[pos] != lexer::TokType::RBrace {
         let (block_node, tmp_pos) = r#try!(p_block(toks, pos));
         pos = tmp_pos;
         fn_node.child.push(block_node);
-        tok = &toks[pos];
     }
 
-    let tok = &toks[pos];
-    if *tok != lexer::TokType::RBrace {
+    if pos >= toks.len() {
+        return Err(format!("Missing `}}`"));
+    }
+    if toks[pos] != lexer::TokType::RBrace {
         return Err(format!("Expected `}}`, found {:?} at {}", toks[pos], pos));
     }
     pos = pos + 1;
@@ -281,21 +287,23 @@ fn p_block(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize),
     match tok {
         lexer::TokType::Kwd(lexer::KwdType::Int) => {
             // try to parse declare
-            let mut block_node = ParseNode::new();
-            block_node.entry = NodeType::Block;
+            // let mut block_node = ParseNode::new();
+            // block_node.entry = NodeType::Block;
 
             let (declare_node, pos) = r#try!(p_declare(toks, pos));
-            block_node.child.push(declare_node);
-            return Ok((block_node, pos));
+            // block_node.child.push(declare_node);
+            // return Ok((block_node, pos));
+            return Ok((declare_node, pos));
         }
         _ => {
             // try to parse statement
-            let mut block_node = ParseNode::new();
-            block_node.entry = NodeType::Block;
+            // let mut block_node = ParseNode::new();
+            // block_node.entry = NodeType::Block;
 
             let (stmt_node, pos) = r#try!(p_stmt(toks, pos));
-            block_node.child.push(stmt_node);
-            return Ok((block_node, pos));
+            return Ok((stmt_node, pos));
+            // block_node.child.push(stmt_node);
+            //return Ok((block_node, pos));
         }
     }
 }
@@ -303,6 +311,23 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
     // println!("in fn : p_stmt, with pos {}", pos);
     let tok = &toks[pos];
     match tok {
+        lexer::TokType::LBrace => {
+            // "{" { <block-item> } "}"
+            let mut pos = pos + 1;
+            let mut stmt_node = ParseNode::new();
+            stmt_node.entry = NodeType::Stmt(StmtType::Compound);
+
+            // try to get some block item
+            while toks[pos] != lexer::TokType::RBrace {
+                let (block_node, tmp_pos) = r#try!(p_block(toks, pos));
+                stmt_node.child.push(block_node);
+                pos = tmp_pos;
+            }
+
+            // throw "}"
+            pos = pos + 1;
+            return Ok((stmt_node, pos));
+        }
         lexer::TokType::Kwd(lexer::KwdType::Ret) => {
             // "return" <exp> ";"
             let pos = pos + 1;
@@ -318,7 +343,7 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
             pos = pos + 1;
 
             let mut stmt_node = ParseNode::new();
-            stmt_node.entry = NodeType::Stmt(stmt_type::Return);
+            stmt_node.entry = NodeType::Stmt(StmtType::Return);
             stmt_node.child.push(exp_node);
             return Ok((stmt_node, pos));
         }
@@ -326,7 +351,7 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
             // "if" "(" <exp> ")" <statement> [ "else" <statement> ]
             // this is the conditional statement
             let mut stmt_node = ParseNode::new();
-            stmt_node.entry = NodeType::Stmt(stmt_type::Conditional("if".to_string()));
+            stmt_node.entry = NodeType::Stmt(StmtType::Conditional("if".to_string()));
             let pos = pos + 1;
             if pos >= toks.len() || toks[pos] != lexer::TokType::LParen {
                 return Err(format!("Missing `(`"));
@@ -362,7 +387,7 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
         _ => {
             // try to parse exp;
             let mut stmt_node = ParseNode::new();
-            stmt_node.entry = NodeType::Stmt(stmt_type::Exp);
+            stmt_node.entry = NodeType::Stmt(StmtType::Exp);
             //let pos = pos + 1;
             let (exp_node, pos) = r#try!(p_exp(toks, pos));
 
@@ -747,13 +772,11 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
                 format!("{}n_type: Declare, var_name: {}", idt_prefix, var_name)
             } else {
                 format!(
-                    "{}n_type: Stmt::Declare, var_name: {}, [\n{}\n{}]",
+                    "{}n_type: Declare, var_name: {}, [\n{}\n{}]",
                     idt_prefix,
                     var_name,
                     print(
-                        tree.child
-                            .get(0)
-                            .expect("Statement::Declare Node has no child"),
+                        tree.child.get(0).expect("Declare Node has no child"),
                         idt + 1
                     ),
                     idt_prefix
@@ -776,7 +799,7 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
             )
         }
         NodeType::Stmt(stmt) => match stmt {
-            stmt_type::Return => format!(
+            StmtType::Return => format!(
                 "{}n_type: Stmt::Return, [\n{}\n{}]",
                 idt_prefix,
                 print(
@@ -787,7 +810,7 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
                 ),
                 idt_prefix
             ),
-            stmt_type::Exp => format!(
+            StmtType::Exp => format!(
                 "{}n_type: Stmt::Exp, [\n{}\n{}]",
                 idt_prefix,
                 print(
@@ -796,7 +819,7 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
                 ),
                 idt_prefix
             ),
-            stmt_type::Conditional(op) => {
+            StmtType::Conditional(op) => {
                 let mut tmp = String::new();
                 let mut inc = 0;
                 for it in tree.child.iter() {
@@ -809,6 +832,22 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
                 format!(
                     "{}n_type: Stmt::Conditional, Op: {} [\n{}\n{}]",
                     idt_prefix, op, tmp, idt_prefix
+                )
+            }
+            StmtType::Compound => {
+                let mut tmp = String::new();
+                let mut inc = 0;
+
+                for it in tree.child.iter() {
+                    if inc > 0 {
+                        tmp.push_str("\n");
+                    }
+                    tmp.push_str(&print(it, idt + 1));
+                    inc += 1;
+                }
+                format!(
+                    "{}n_type: Stmt::Compound, [\n{}\n{}]",
+                    idt_prefix, tmp, idt_prefix
                 )
             }
         },

@@ -324,3 +324,30 @@ dst=$dstdir/multiple_if.s
 test_fun $src $dst
 
 
+src=$srcdir/consecutive_blocks.c
+dst=$dstdir/consecutive_blocks.s
+test_fun $src $dst
+src=$srcdir/consecutive_declarations.c
+dst=$dstdir/consecutive_declarations.s
+test_fun $src $dst
+src=$srcdir/declare_after_block.c
+dst=$dstdir/declare_after_block.s
+test_fun $src $dst
+src=$srcdir/declare_block.c
+dst=$dstdir/declare_block.s
+test_fun $src $dst
+src=$srcdir/declare_late.c
+dst=$dstdir/declare_late.s
+test_fun $src $dst
+src=$srcdir/multi_nesting.c
+dst=$dstdir/multi_nesting.s
+test_fun $src $dst
+src=$srcdir/nested_if.c
+dst=$dstdir/nested_if.s
+test_fun $src $dst
+src=$srcdir/nested_scope.c
+dst=$dstdir/nested_scope.s
+test_fun $src $dst
+src=$srcdir/nested_scope_2.c
+dst=$dstdir/nested_scope_2.s
+test_fun $src $dst
