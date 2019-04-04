@@ -176,6 +176,7 @@ pub fn gen_block(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isiz
 
     // iter every block
     let mut stmts = String::new();
+    //let idx: &mut isize = &mut -8;
     let mut index_map = index_map.clone();
     let mut idx: isize = idx;
     let mut scope: HashSet<String> = HashSet::new();
@@ -475,7 +476,7 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                      {}pushq %rax\n\
                      {}\
                      {}popq %rcx\n\
-                     {}cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise\n\
+                     {}cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise\n\
                      {}movq $0, %rax   # zero out EAX, does not change flag\n\
                      {}sete %al\n",
                     gen_stmt(
