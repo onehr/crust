@@ -446,9 +446,11 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
                         return Err(format!("Missing `)` needed by For"));
                     }
                     let pos = pos + 1;
-
+                    let mut compound_layer_node = ParseNode::new();
+                    compound_layer_node.entry = NodeType::Stmt(StmtType::Compound);
                     let (next_stmt_node, pos) = r#try!(p_stmt(toks, pos));
-                    stmt_node.child.push(next_stmt_node);
+                    compound_layer_node.child.push(next_stmt_node);
+                    stmt_node.child.push(compound_layer_node);
                     return Ok((stmt_node, pos));
                 }
                 Err(_) => {
@@ -477,9 +479,11 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
                         return Err(format!("Missing `)` needed by for"));
                     }
                     let pos = pos + 1;
-
+                    let mut compound_layer_node = ParseNode::new();
                     let (next_stmt_node, pos) = r#try!(p_stmt(toks, pos));
-                    stmt_node.child.push(next_stmt_node);
+                    compound_layer_node.child.push(next_stmt_node);
+                    compound_layer_node.entry = NodeType::Stmt(StmtType::Compound);
+                    stmt_node.child.push(compound_layer_node);
                     return Ok((stmt_node, pos));
                 }
             }

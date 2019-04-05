@@ -8,7 +8,7 @@ dstdir=gen
 RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m'
-inc=1
+inc=0
 # now try function to test
 test_fun() {
     ./target/debug/crust $1 $2
@@ -386,6 +386,9 @@ test_fun $src $dst
 src=$srcdir/nested_while_2.c
 dst=$dstdir/nested_while_2.s
 test_fun $src $dst
+src=$srcdir/nested_while_3.c
+dst=$dstdir/nested_while_3.s
+test_fun $src $dst
 src=$srcdir/nested_for.c
 dst=$dstdir/nested_for.s
 test_fun $src $dst
@@ -393,6 +396,15 @@ test_fun $src $dst
 src=$srcdir/nested_break.c
 dst=$dstdir/nested_break.s
 test_fun $src $dst
+
+src=$srcdir/nested_break_2.c
+dst=$dstdir/nested_break_2.s
+test_fun $src $dst
+
+src=$srcdir/nested_break_3.c
+dst=$dstdir/nested_break_3.s
+test_fun $src $dst
+
 src=$srcdir/nested_while.c
 dst=$dstdir/nested_while.s
 test_fun $src $dst
@@ -405,3 +417,10 @@ test_fun $src $dst
 src=$srcdir/while_single_statement.c
 dst=$dstdir/while_single_statement.s
 test_fun $src $dst
+
+src=$srcdir/combine.c
+dst=$dstdir/combine.s
+test_fun $src $dst
+
+
+echo -e "Passed all [$inc] tests :)"

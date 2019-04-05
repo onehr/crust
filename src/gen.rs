@@ -179,11 +179,7 @@ pub fn gen_declare(
     }
 }
 
-pub fn gen_for(
-    tree: &ParseNode,
-    index_map: &HashMap<String, isize>,
-    idx: isize
-) -> String {
+pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize) -> String {
     let p = "        ".to_string();
     let label_begin_loop = gen_labels("BFOR".to_string());
     let label_end_loop = gen_labels("EFOR".to_string());
@@ -231,7 +227,7 @@ pub fn gen_for(
                 idx,
                 Some(&label_begin_loop),
                 Some(&label_end_loop),
-                true
+                true,
             );
             //           generate init (declare)
             // BEGN_LOOP:
@@ -265,7 +261,8 @@ pub fn gen_for(
                 p,
                 label_begin_loop,
                 label_end_loop,
-                p, b_deallocate
+                p,
+                b_deallocate
             )
         }
         NodeType::Stmt(StmtType::For) => {
@@ -302,7 +299,7 @@ pub fn gen_for(
                 idx,
                 Some(&label_begin_loop),
                 Some(&label_end_loop),
-                true
+                true,
             );
             //           generate init
             // BEGN_LOOP:
@@ -336,7 +333,8 @@ pub fn gen_for(
                 p,
                 label_begin_loop,
                 label_end_loop,
-                p, b_deallocate
+                p,
+                b_deallocate
             )
         }
         _ => panic!("Something wrong in gen_for"),
@@ -386,7 +384,7 @@ pub fn gen_block(
                     idx,
                     loop_in_label,
                     loop_out_label,
-                    true
+                    true,
                 ));
             }
             _ => {
@@ -585,7 +583,7 @@ pub fn gen_stmt(
                     idx,
                     loop_in_label,
                     loop_out_label,
-                    true
+                    true,
                 ); // should enter a new scope
                 let exp = gen_stmt(
                     tree.child.get(1).unwrap(),
@@ -632,7 +630,7 @@ pub fn gen_stmt(
                     idx,
                     Some(&lbb),
                     Some(&leb),
-                    true
+                    true,
                 ); // should enter a new scope
                 format!(
                     "{}:\n\
@@ -645,8 +643,9 @@ pub fn gen_stmt(
                     lbb, exp, p, p, leb, stmts, p, lbb, leb
                 )
             }
-            StmtType::Compound =>
-                gen_block(tree, index_map, idx, loop_in_label, loop_out_label, true),
+            StmtType::Compound => {
+                gen_block(tree, index_map, idx, loop_in_label, loop_out_label, true)
+            }
         },
         NodeType::AssignNode(var_name) => {
             match index_map.get(var_name) {
