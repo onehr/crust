@@ -3,7 +3,9 @@ use crate::lexer;
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum NodeType {
     Prog(String),
-    Fn(String, Option<Box<NodeType>>), // <function> ::= "int" <id> "(" ")" "{" {<block-item>} "}"
+    // TODO: now only support int parameters
+    // <function> ::= "int" <id> "(" [ "int" <id> { "," "int" <id> } ] ")" "{" {<block-item>} "}"
+    Fn(String, Option<Vec<String>>),
     Stmt(StmtType),
     // <statement> ::= "return" <exp> ";"
     //               | <exp-option> ";"
@@ -30,7 +32,8 @@ pub enum NodeType {
     RelationalExp, // <relational-exp> ::= <additive-exp> { ("<" | ">" | "<=" | ">=") <additive-exp> }
     AdditiveExp,   // <additive-exp> ::= <term> { ("+" | "-") <term> }
     Term,          // <term> ::= <factor> { ("*" | "/") <factor> }
-    Factor,        // <factor> ::= "(" <exp> ")" | <unary_op> <factor> | <int> | <id>
+    Factor, // <factor> ::= <function-call> | "(" <exp> ")" | <unary_op> <factor> | <int> | <id>
+    FnCall(String), // <function-call> ::= id "(" [ <exp> { "," <exp> } ] ")"
     Declare(String), // <declaration> ::= "int" <id> [= <exp> ] ";"
 }
 
@@ -186,11 +189,13 @@ fn p_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), S
     }
 }
 
-// TODO: now only support one function: which is main
 fn p_fn(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
     // println!("in p_fn with pos: {}", pos);
     // <function> ::= "int" <id> "(" ")" "{" { <statement> } "}"
     // now add multi-statements support
+    if pos >= toks.len() {
+        return Err("Out of program length".to_string());
+    }
     let tok = &toks[pos];
     if *tok != lexer::TokType::Kwd(lexer::KwdType::Int) {
         return Err(format!("Expected `int`, found {:?} at {}", toks[pos], pos));
@@ -207,9 +212,6 @@ fn p_fn(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), St
             return Err(format!("Expected function name, but not function name"));
         }
     }
-    if *tok != lexer::TokType::Identifier("main".to_string()) {
-        return Err(format!("Expected `main`, found {:?} at {}", toks[pos], pos));
-    }
     pos = pos + 1;
 
     let tok = &toks[pos];
@@ -217,7 +219,51 @@ fn p_fn(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), St
         return Err(format!("Expected `(`, found {:?} at {}", toks[pos], pos));
     }
     pos = pos + 1;
-
+    // XXX: add void support, now only support int arg list
+    let mut arg_list: Vec<String> = Vec::new();
+    while pos < toks.len() && toks[pos] != lexer::TokType::RParen {
+        // try to parse argument list
+        // match int
+        match &toks[pos] {
+            lexer::TokType::Kwd(lexer::KwdType::Int) => {
+                pos = pos + 1;
+            }
+            _ => {
+                return Err(format!("Expected `int`, found {:?} at {}", toks[pos], pos));
+            }
+        }
+        // match identifier
+        match &toks[pos] {
+            lexer::TokType::Identifier(var_name) => {
+                arg_list.push(var_name.to_string());
+                pos = pos + 1;
+            }
+            _ => {
+                return Err(format!(
+                    "Expected identifier name, found {:?} at {}",
+                    toks[pos], pos
+                ));
+            }
+        }
+        // match ,
+        match &toks[pos] {
+            lexer::TokType::Comma => {
+                pos = pos + 1;
+            }
+            lexer::TokType::RParen => {
+                continue;
+            }
+            _ => {
+                return Err(format!(
+                    "Expected `,` or `)` at the end of one var_name, found {:?} at {}",
+                    toks[pos], pos
+                ));
+            }
+        }
+        if toks[pos] == lexer::TokType::RParen {
+            break;
+        }
+    }
     let tok = &toks[pos];
     if *tok != lexer::TokType::RParen {
         return Err(format!("Expected `)`, found {:?} at {}", toks[pos], pos));
@@ -231,7 +277,11 @@ fn p_fn(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), St
     pos = pos + 1;
 
     let mut fn_node = ParseNode::new();
-    fn_node.entry = NodeType::Fn(fn_name, None);
+    if arg_list.is_empty() {
+        fn_node.entry = NodeType::Fn(fn_name, None);
+    } else {
+        fn_node.entry = NodeType::Fn(fn_name, Some(arg_list));
+    }
 
     while pos < toks.len() && toks[pos] != lexer::TokType::RBrace {
         let (block_node, tmp_pos) = r#try!(p_block(toks, pos));
@@ -247,7 +297,7 @@ fn p_fn(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), St
     }
     pos = pos + 1;
 
-    // println!("out p_fn with pos: {}", pos);
+    //println!("out p_fn with pos: {}", pos);
     Ok((fn_node, pos))
 }
 
@@ -632,18 +682,86 @@ fn p_factor(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize)
             return Ok((factor_node, pos));
         }
         lexer::TokType::Identifier(var_name) => {
-            // Factor -> Var
-            let mut var_node = ParseNode::new();
-            let mut factor_node = ParseNode::new();
-            var_node.entry = NodeType::Var(var_name.to_string());
-            factor_node.entry = NodeType::Factor;
-            factor_node.child.push(var_node);
-
-            // println!("out p_factor with pos: {}", pos);
-            return Ok((factor_node, pos));
+            if pos < toks.len() && toks[pos] == lexer::TokType::LParen {
+                // Factor -> FnCall
+                let mut factor_node = ParseNode::new();
+                pos = pos - 1;
+                factor_node.entry = NodeType::Factor;
+                let (fn_call_node, pos) = r#try!(p_fn_call(toks, pos));
+                factor_node.child.push(fn_call_node);
+                return Ok((factor_node, pos));
+            } else {
+                // Factor -> Var
+                let mut var_node = ParseNode::new();
+                let mut factor_node = ParseNode::new();
+                var_node.entry = NodeType::Var(var_name.to_string());
+                factor_node.entry = NodeType::Factor;
+                factor_node.child.push(var_node);
+                // println!("out p_factor with pos: {}", pos);
+                return Ok((factor_node, pos));
+            }
         }
         _ => Err(format!("Factor rule not allowed.")),
     }
+}
+
+fn p_fn_call(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
+    // <function-call> ::= id "(" [ <exp> { "," <exp> } ] ")"
+    //println!("in fn p_fn_call");
+    let mut fn_call_node = ParseNode::new();
+    let mut fn_name = String::new();
+    match &toks[pos] {
+        lexer::TokType::Identifier(name) => {
+            fn_name = name.to_string();
+        }
+        _ => {
+            return Err(format!(
+                "Expected function name, found {:?} at {}",
+                toks[pos], pos
+            ));
+        }
+    }
+    fn_call_node.entry = NodeType::FnCall(fn_name);
+    let mut pos = pos + 1;
+    // match '('
+    match toks[pos] {
+        lexer::TokType::LParen => {
+            pos = pos + 1;
+        }
+        _ => {
+            return Err(format!(
+                "Expected `(` needed by function call, found {:?} at {}",
+                toks[pos], pos
+            ));
+        }
+    }
+    while pos < toks.len() && toks[pos] != lexer::TokType::RParen {
+        // try to parse argument exp
+        let (exp_node, new_pos) = r#try!(p_exp(toks, pos));
+        fn_call_node.child.push(exp_node);
+        pos = new_pos;
+
+        // match ,
+        match &toks[pos] {
+            lexer::TokType::Comma => {
+                pos = pos + 1;
+            }
+            lexer::TokType::RParen => {
+                continue;
+            }
+            _ => {
+                return Err(format!(
+                    "Expected `,` or `)` at the end of exp, found {:?} at {}",
+                    toks[pos], pos
+                ));
+            }
+        }
+        if toks[pos] == lexer::TokType::RParen {
+            break;
+        }
+    }
+    pos = pos + 1;
+    return Ok((fn_call_node, pos));
 }
 
 fn p_logical_and_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
@@ -847,20 +965,32 @@ fn p_additive_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, 
 
 pub fn parse_prog(input: &String, c_src_name: &String) -> Result<ParseNode, String> {
     let toks = r#try!(lexer::lex(&input));
-
+    let mut prog_node = ParseNode::new();
+    prog_node.entry = NodeType::Prog(c_src_name.to_string());
+    let mut pos = 0;
+    while let (fn_node, new_pos) = r#try!(p_fn(&toks, pos)) {
+        prog_node.child.push(fn_node);
+        pos = new_pos;
+        if (pos >= toks.len()) {
+            break;
+        }
+    }
+    //println!("len = {}", prog_node.child.len());
+    return Ok(prog_node);
+    /*
     p_fn(&toks, 0).and_then(|(n, i)| {
-        if i == toks.len() {
+        if i <= toks.len() {
             let mut prog_node = ParseNode::new();
             prog_node.entry = NodeType::Prog(c_src_name.to_string());
             prog_node.child.push(n);
-            Ok(prog_node)
+            //Ok(prog_node)
         } else {
             Err(format!(
                 "Expected end of input, found {:?} at {}",
                 &toks[i], i
             ))
         }
-    })
+    })*/
 }
 
 pub fn print(tree: &ParseNode, idt: usize) -> String {
@@ -919,17 +1049,18 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
             print(tree.child.get(0).expect("Term Node has no child"), idt + 1),
             idt_prefix
         ),
-        NodeType::Prog(prog_name) => format!(
-            "{}n_type: Prog, Name:{} [\n{}\n{}]",
-            idt_prefix,
-            prog_name,
-            print(
-                tree.child.get(0).expect("Progam Node has no child"),
-                idt + 1
-            ),
-            idt_prefix
-        ),
-        NodeType::Fn(fn_name, _) => {
+        NodeType::Prog(prog_name) => {
+            let mut prog_body = String::new();
+            for it in tree.child.iter() {
+                prog_body.push_str(&print(it, idt + 1));
+                prog_body.push_str("\n");
+            }
+            format!(
+                "{}n_type: Prog, Name:{} [\n{}\n{}]",
+                idt_prefix, prog_name, prog_body, idt_prefix
+            )
+        }
+        NodeType::FnCall(fn_name) => {
             let mut tmp = String::new();
             let mut inc = 0;
             for it in tree.child.iter() {
@@ -939,9 +1070,38 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
                 tmp.push_str(&print(it, idt + 1));
                 inc = inc + 1;
             }
+
             format!(
-                "{}n_type: Fn, Name: {} [\n{}\n{}]",
+                "{}n_type: FnCall, Name: {} exp_list: [\n{}\n{}]",
                 idt_prefix, fn_name, tmp, idt_prefix
+            )
+            // list of exp
+        }
+        NodeType::Fn(fn_name, vars) => {
+            let mut tmp = String::new();
+            let mut inc = 0;
+            for it in tree.child.iter() {
+                if inc > 0 {
+                    tmp.push_str("\n");
+                }
+                tmp.push_str(&print(it, idt + 1));
+                inc = inc + 1;
+            }
+            let mut var_list_string = String::new();
+            match vars {
+                Some(var_list) => {
+                    for var in var_list {
+                        var_list_string.push_str(" ");
+                        var_list_string.push_str(var);
+                        var_list_string.push_str(" ");
+                    }
+                }
+                None => {}
+            }
+            format!(
+                "{}n_type: Fn, Name: {} var_list: [{}]\n\
+                 {}[\n{}\n{}]",
+                idt_prefix, fn_name, var_list_string, idt_prefix, tmp, idt_prefix
             )
         }
         NodeType::Declare(var_name) => {

@@ -423,4 +423,43 @@ dst=$dstdir/combine.s
 test_fun $src $dst
 
 
+src=$srcdir/expression_args.c
+dst=$dstdir/expression_args.s
+test_fun $src $dst
+src=$srcdir/fib.c
+dst=$dstdir/fib.s
+test_fun $src $dst
+
+src=$srcdir/fun_in_expr.c
+dst=$dstdir/fun_in_expr.s
+test_fun $src $dst
+
+src=$srcdir/multi_arg.c
+dst=$dstdir/multi_arg.s
+test_fun $src $dst
+
+src=$srcdir/mutual_recursion.c
+dst=$dstdir/mutual_recursion.s
+test_fun $src $dst
+
+src=$srcdir/no_arg.c
+dst=$dstdir/no_arg.s
+test_fun $src $dst
+
+src=$srcdir/new_precedence.c
+dst=$dstdir/new_precedence.s
+test_fun $src $dst
+
+src=$srcdir/rename_function_param.c
+dst=$dstdir/rename_function_param.s
+test_fun $src $dst
+
+src=$srcdir/single_arg.c
+dst=$dstdir/single_arg.s
+test_fun $src $dst
+
+src=$srcdir/variable_as_arg.c
+dst=$dstdir/variable_as_arg.s
+test_fun $src $dst
+
 echo -e "Passed all [$inc] tests :)"

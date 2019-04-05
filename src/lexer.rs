@@ -39,6 +39,7 @@ pub enum TokType {
     GreaterEqual,       // >=
     Colon,              // :
     QuestionMark,       // ?
+    Comma,              // ,
 }
 
 pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
@@ -235,6 +236,10 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
             }
             ':' => {
                 result.push(TokType::Colon);
+                it.next();
+            }
+            ',' => {
+                result.push(TokType::Comma);
                 it.next();
             }
             ' ' | '\n' | '\t' | '\r' => {

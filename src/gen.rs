@@ -65,10 +65,35 @@ pub fn gen_prog(tree: &ParseNode) -> String {
     let idx: isize = 0;
     for it in tree.child.iter() {
         match &it.entry {
-            NodeType::Fn(fn_name, _) => {
+            NodeType::Fn(fn_name, var_list_opt) => {
                 let fn_prologue = gen_fn_prologue(fn_name.to_string());
                 let fn_epilogue = gen_fn_epilogue();
-                let fn_body = &gen_block(it, &index_map, idx, None, None, true);
+                // cause in function, we have to pass the offset of argument and scope contains argument
+                // to function body
+                let CALL_BY_FUNCTION = true;
+                let mut param_offset = 16; // EBP + 16 (old EBP at 0, return address at 8)
+                let mut index_map: HashMap<String, isize> = HashMap::new();
+                let mut scope: HashMap<String, bool> = HashMap::new();
+                match var_list_opt {
+                    Some(var_list) => {
+                        for var in var_list {
+                            index_map.insert(var.to_string(), param_offset);
+                            scope.insert(var.to_string(), true);
+                            param_offset += 8;
+                        }
+                    }
+                    None => {}
+                }
+                let fn_body = &gen_block(
+                    it,
+                    &index_map,
+                    &scope,
+                    idx,
+                    None,
+                    None,
+                    true,
+                    CALL_BY_FUNCTION,
+                );
                 let tmp = unsafe {
                     if FLAG_FOR_MAIN_HAS_RET == false {
                         format!(
@@ -121,13 +146,13 @@ pub fn gen_prog(tree: &ParseNode) -> String {
 pub fn gen_declare(
     tree: &ParseNode,
     index_map: &HashMap<String, isize>,
-    scope: &HashSet<String>,
+    scope: &HashMap<String, bool>, // 1 -> function argument, 0 -> local variables
     idx: isize,
     lbb: &str,
     leb: &str,
     loop_in_label: Option<&str>,
     loop_out_label: Option<&str>,
-) -> (HashMap<String, isize>, HashSet<String>, isize, String) {
+) -> (HashMap<String, isize>, HashMap<String, bool>, isize, String) {
     // println!("in gen_declare with {:?}", tree.entry);
     let p = "        ";
     let mut index_map = index_map.clone();
@@ -135,19 +160,46 @@ pub fn gen_declare(
     let mut idx = idx;
     match &tree.entry {
         NodeType::Declare(var_name) => {
-            if scope.contains(var_name) {
-                panic!(
-                    "Error: redeclaration of variable `{}` in the same scope",
-                    var_name
-                );
-            } else {
-                let tmp_str = format!("{}", var_name);
-                scope.insert(tmp_str);
-                // try to clear the previous index
-                let tmp_str = format!("{}", var_name);
-                index_map.insert(tmp_str, idx - 8);
-                idx -= 8;
+            let get_opt = scope.get(var_name);
+            match get_opt {
+                Some(flag) => {
+                    match flag {
+                        true => {
+                            // this variable is in scope, but was passed by function argument, so just shallow it
+                            scope.insert(var_name.to_string(), false);
+                            // println!("scope after insert: {:?}", scope);
+                            index_map.insert(var_name.to_string(), idx - 8);
+                            idx -= 8;
+                        }
+                        false => {
+                            panic!(
+                                "Error: redeclaration of variable `{}` in the same scope",
+                                var_name
+                            );
+                        }
+                    }
+                }
+                None => {
+                    // not declared
+                    scope.insert(var_name.to_string(), false);
+                    // println!("scope after insert: {:?}", scope);
+                    index_map.insert(var_name.to_string(), idx - 8);
+                    idx -= 8;
+                }
             }
+            // if scope.get(var_name) {
+            //     panic!(
+            //         "Error: redeclaration of variable `{}` in the same scope",
+            //         var_name
+            //     );
+            // } else {
+            //     let tmp_str = format!("{}", var_name);
+            //     scope.insert(tmp_str);
+            //     // try to clear the previous index
+            //     let tmp_str = format!("{}", var_name);
+            //     index_map.insert(tmp_str, idx - 8);
+            //     idx -= 8;
+            // }
 
             // judge whether it's initialized
             let mut e1 = String::new();
@@ -187,7 +239,7 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
     let mut index_map = index_map.clone();
     let mut idx: isize = idx;
     // now in a new block now
-    let mut scope: HashSet<String> = HashSet::new();
+    let mut scope: HashMap<String, bool> = HashMap::new();
     match tree.entry {
         NodeType::Stmt(StmtType::ForDecl) => {
             let (index_map_new, scope_new, idx_new, init) = gen_declare(
@@ -224,10 +276,12 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
             let stmt = gen_block(
                 tree.child.get(3).unwrap(),
                 &index_map,
+                &scope,
                 idx,
                 Some(&label_begin_loop),
                 Some(&label_end_loop),
                 true,
+                false,
             );
             //           generate init (declare)
             // BEGN_LOOP:
@@ -238,7 +292,13 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
             //           pos-expression
             //           jmp BEGIN_LOOP
             // END_LOOP:
-            let b_deallocate = 8 * scope.len();
+            //let b_deallocate = 8 * scope.len();
+            let mut b_deallocate = 0;
+            for (_, val) in scope.iter() {
+                if (*val == false) {
+                    b_deallocate += 8;
+                }
+            }
             format!(
                 "{}\
                  {}:\n\
@@ -249,7 +309,7 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
                  {}\
                  {}jmp {}\n\
                  {}:\n\
-                 {}addq ${}, %rsp\n",
+                 {}addq ${}, %rsp # for out clear block\n",
                 init,
                 label_begin_loop,
                 condition,
@@ -296,10 +356,12 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
             let stmt = gen_block(
                 tree.child.get(3).unwrap(),
                 &index_map,
+                &scope,
                 idx,
                 Some(&label_begin_loop),
                 Some(&label_end_loop),
                 true,
+                false,
             );
             //           generate init
             // BEGN_LOOP:
@@ -310,7 +372,13 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
             //           pos-expression
             //           jmp BEGIN_LOOP
             // END_LOOP:
-            let b_deallocate = 8 * scope.len();
+            // let b_deallocate = 8 * scope.len();
+            let mut b_deallocate = 0;
+            for (_, val) in scope.iter() {
+                if (*val == false) {
+                    b_deallocate += 8;
+                }
+            }
             format!(
                 "{}\
                  {}:\n\
@@ -321,7 +389,7 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
                  {}\
                  {}jmp {}\n\
                  {}:\n\
-                 {}addq ${}, %rsp\n",
+                 {}addq ${}, %rsp # for out clear stack\n",
                 init,
                 label_begin_loop,
                 condition,
@@ -344,10 +412,12 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
 pub fn gen_block(
     tree: &ParseNode,
     index_map: &HashMap<String, isize>,
+    scope: &HashMap<String, bool>,
     idx: isize,
     loop_in_label: Option<&str>,
     loop_out_label: Option<&str>,
     flag: bool,
+    call_by_fn: bool,
 ) -> String {
     let p = "        ".to_string(); // 8 white spaces
     let label_begin_block = gen_labels("BB".to_string());
@@ -356,7 +426,11 @@ pub fn gen_block(
     let mut stmts = String::new();
     let mut index_map = index_map.clone();
     let mut idx: isize = idx;
-    let mut scope: HashSet<String> = HashSet::new();
+    let mut current_scope: HashMap<String, bool> = scope.clone();
+    if call_by_fn == false {
+        current_scope = HashMap::new();
+    }
+    // let mut scope: HashSet<String> = HashSet::new();
 
     for it in &tree.child {
         // iter through every block-item
@@ -365,7 +439,7 @@ pub fn gen_block(
                 let (index_map_new, scope_new, idx_new, s) = gen_declare(
                     it,
                     &index_map,
-                    &scope,
+                    &current_scope,
                     idx,
                     &label_begin_block,
                     &label_end_block,
@@ -374,17 +448,19 @@ pub fn gen_block(
                 );
                 index_map = index_map_new.clone();
                 idx = idx_new;
-                scope = scope_new.clone();
+                current_scope = scope_new.clone();
                 stmts.push_str(&s);
             }
             NodeType::Stmt(StmtType::Compound) => {
                 stmts.push_str(&gen_block(
                     it,
                     &index_map,
+                    &current_scope,
                     idx,
                     loop_in_label,
                     loop_out_label,
                     true,
+                    false, // call by  function not true
                 ));
             }
             _ => {
@@ -401,16 +477,24 @@ pub fn gen_block(
             }
         }
     }
-    let b_deallocate = match flag {
-        true => 8 * scope.len(),
-        false => 0,
-    };
+    let mut b_deallocate = 0;
+    for (_, val) in current_scope.iter() {
+        if *val == false {
+            b_deallocate += 8;
+        }
+    }
+
+    // println!("scope : {:?}, deallocate = {}", current_scope, b_deallocate);
+    // let b_deallocate = match flag {
+    //     true => 8 * scope.len(),
+    //     false => 0,
+    // };
     // let b_deallocate = 8 * scope.len(); // deallocate stack
     format!(
         "{}:\n\
          {}\
          {}:\n\
-         {}addq ${}, %rsp\n",
+         {}addq ${}, %rsp # block out\n",
         label_begin_block, stmts, label_end_block, p, b_deallocate
     )
 }
@@ -486,6 +570,34 @@ pub fn gen_stmt(
             } else {
                 panic!("Error: something wrong in conditional expression")
             }
+        }
+        NodeType::FnCall(fn_name) => {
+            // iter every expression in reverse direction
+            // and then push them in stack
+            let mut s: String = String::new();
+            for it in tree.child.iter().rev() {
+                // generate expression
+                s.push_str(&gen_stmt(
+                    it,
+                    index_map,
+                    idx,
+                    lbb,
+                    leb,
+                    loop_in_label,
+                    loop_out_label,
+                ));
+                // pushq
+                s.push_str(&format!("{}pushq %rax\n", p));
+            }
+            // call the function
+            s.push_str(&format!("{}call {}\n", p, fn_name));
+            // after the callee function returns, remove the arguments from stack
+            s.push_str(&format!(
+                "{}addq ${}, %rsp # remove the arguments\n",
+                p,
+                8 * tree.child.len()
+            ));
+            s
         }
         NodeType::Stmt(stmt) => match stmt {
             StmtType::Return => format!(
@@ -577,13 +689,16 @@ pub fn gen_stmt(
                 // LEB
                 let lbb = gen_labels("BDO".to_string());
                 let leb = gen_labels("EDO".to_string());
+                let scope: HashMap<String, bool> = HashMap::new();
                 let stmts = gen_block(
                     tree.child.get(0).unwrap(),
                     index_map,
+                    &scope,
                     idx,
                     loop_in_label,
                     loop_out_label,
                     true,
+                    false,
                 ); // should enter a new scope
                 let exp = gen_stmt(
                     tree.child.get(1).unwrap(),
@@ -614,7 +729,7 @@ pub fn gen_stmt(
                 // LEB.
                 let lbb = gen_labels("BWHILE".to_string());
                 let leb = gen_labels("EWHILE".to_string());
-
+                let scope: HashMap<String, bool> = HashMap::new();
                 let exp = gen_stmt(
                     tree.child.get(0).unwrap(),
                     index_map,
@@ -627,10 +742,12 @@ pub fn gen_stmt(
                 let stmts = gen_block(
                     tree.child.get(1).unwrap(),
                     index_map,
+                    &scope,
                     idx,
                     Some(&lbb),
                     Some(&leb),
                     true,
+                    false,
                 ); // should enter a new scope
                 format!(
                     "{}:\n\
@@ -644,7 +761,17 @@ pub fn gen_stmt(
                 )
             }
             StmtType::Compound => {
-                gen_block(tree, index_map, idx, loop_in_label, loop_out_label, true)
+                let scope: HashMap<String, bool> = HashMap::new();
+                gen_block(
+                    tree,
+                    index_map,
+                    &scope,
+                    idx,
+                    loop_in_label,
+                    loop_out_label,
+                    true,
+                    false,
+                )
             }
         },
         NodeType::AssignNode(var_name) => {
