@@ -68,7 +68,7 @@ pub fn gen_prog(tree: &ParseNode) -> String {
             NodeType::Fn(fn_name, _) => {
                 let fn_prologue = gen_fn_prologue(fn_name.to_string());
                 let fn_epilogue = gen_fn_epilogue();
-                let fn_body = &gen_block(it, &index_map, idx);
+                let fn_body = &gen_block(it, &index_map, idx, None, None, true);
                 let tmp = unsafe {
                     if FLAG_FOR_MAIN_HAS_RET == false {
                         format!(
@@ -125,7 +125,10 @@ pub fn gen_declare(
     idx: isize,
     lbb: &str,
     leb: &str,
+    loop_in_label: Option<&str>,
+    loop_out_label: Option<&str>,
 ) -> (HashMap<String, isize>, HashSet<String>, isize, String) {
+    // println!("in gen_declare with {:?}", tree.entry);
     let p = "        ";
     let mut index_map = index_map.clone();
     let mut scope = scope.clone();
@@ -161,7 +164,9 @@ pub fn gen_declare(
                     idx,
                     lbb,
                     leb,
-                )
+                    loop_in_label,
+                    loop_out_label,
+                );
             }
             let s = format!(
                 "{}\
@@ -174,8 +179,178 @@ pub fn gen_declare(
     }
 }
 
+pub fn gen_for(
+    tree: &ParseNode,
+    index_map: &HashMap<String, isize>,
+    idx: isize
+) -> String {
+    let p = "        ".to_string();
+    let label_begin_loop = gen_labels("BFOR".to_string());
+    let label_end_loop = gen_labels("EFOR".to_string());
+
+    let mut index_map = index_map.clone();
+    let mut idx: isize = idx;
+    // now in a new block now
+    let mut scope: HashSet<String> = HashSet::new();
+    match tree.entry {
+        NodeType::Stmt(StmtType::ForDecl) => {
+            let (index_map_new, scope_new, idx_new, init) = gen_declare(
+                tree.child.get(0).unwrap(),
+                &index_map,
+                &scope,
+                idx,
+                &label_begin_loop,
+                &label_end_loop,
+                Some(&label_begin_loop),
+                Some(&label_end_loop),
+            );
+            index_map = index_map_new.clone();
+            idx = idx_new;
+            scope = scope_new.clone();
+            let condition = gen_stmt(
+                tree.child.get(1).unwrap(),
+                &index_map,
+                idx,
+                &label_begin_loop,
+                &label_end_loop,
+                Some(&label_begin_loop),
+                Some(&label_end_loop),
+            );
+            let post_exp = gen_stmt(
+                tree.child.get(2).unwrap(),
+                &index_map,
+                idx,
+                &label_begin_loop,
+                &label_end_loop,
+                Some(&label_begin_loop),
+                Some(&label_end_loop),
+            );
+            let stmt = gen_block(
+                tree.child.get(3).unwrap(),
+                &index_map,
+                idx,
+                Some(&label_begin_loop),
+                Some(&label_end_loop),
+                true
+            );
+            //           generate init (declare)
+            // BEGN_LOOP:
+            //           generate condition
+            //           cmpq $0, %rax
+            //           je  END_LOOP
+            //           generate statement
+            //           pos-expression
+            //           jmp BEGIN_LOOP
+            // END_LOOP:
+            let b_deallocate = 8 * scope.len();
+            format!(
+                "{}\
+                 {}:\n\
+                 {}\
+                 {}cmpq $0, %rax\n\
+                 {}je {}\n\
+                 {}\
+                 {}\
+                 {}jmp {}\n\
+                 {}:\n\
+                 {}addq ${}, %rsp\n",
+                init,
+                label_begin_loop,
+                condition,
+                p,
+                p,
+                label_end_loop,
+                stmt,
+                post_exp,
+                p,
+                label_begin_loop,
+                label_end_loop,
+                p, b_deallocate
+            )
+        }
+        NodeType::Stmt(StmtType::For) => {
+            let init = gen_stmt(
+                tree.child.get(0).unwrap(),
+                &index_map,
+                idx,
+                &label_begin_loop,
+                &label_end_loop,
+                Some(&label_begin_loop),
+                Some(&label_end_loop),
+            );
+            let condition = gen_stmt(
+                tree.child.get(1).unwrap(),
+                &index_map,
+                idx,
+                &label_begin_loop,
+                &label_end_loop,
+                Some(&label_begin_loop),
+                Some(&label_end_loop),
+            );
+            let post_exp = gen_stmt(
+                tree.child.get(2).unwrap(),
+                &index_map,
+                idx,
+                &label_begin_loop,
+                &label_end_loop,
+                Some(&label_begin_loop),
+                Some(&label_end_loop),
+            );
+            let stmt = gen_block(
+                tree.child.get(3).unwrap(),
+                &index_map,
+                idx,
+                Some(&label_begin_loop),
+                Some(&label_end_loop),
+                true
+            );
+            //           generate init
+            // BEGN_LOOP:
+            //           generate condition
+            //           cmpq $0, %rax
+            //           je  END_LOOP
+            //           generate statement
+            //           pos-expression
+            //           jmp BEGIN_LOOP
+            // END_LOOP:
+            let b_deallocate = 8 * scope.len();
+            format!(
+                "{}\
+                 {}:\n\
+                 {}\
+                 {}cmpq $0, %rax\n\
+                 {}je {}\n\
+                 {}\
+                 {}\
+                 {}jmp {}\n\
+                 {}:\n\
+                 {}addq ${}, %rsp\n",
+                init,
+                label_begin_loop,
+                condition,
+                p,
+                p,
+                label_end_loop,
+                stmt,
+                post_exp,
+                p,
+                label_begin_loop,
+                label_end_loop,
+                p, b_deallocate
+            )
+        }
+        _ => panic!("Something wrong in gen_for"),
+    }
+}
 /// gen_block() - into a new block, will have empty scope
-pub fn gen_block(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize) -> String {
+pub fn gen_block(
+    tree: &ParseNode,
+    index_map: &HashMap<String, isize>,
+    idx: isize,
+    loop_in_label: Option<&str>,
+    loop_out_label: Option<&str>,
+    flag: bool,
+) -> String {
     let p = "        ".to_string(); // 8 white spaces
     let label_begin_block = gen_labels("BB".to_string());
     let label_end_block = gen_labels("EB".to_string());
@@ -196,6 +371,8 @@ pub fn gen_block(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isiz
                     idx,
                     &label_begin_block,
                     &label_end_block,
+                    loop_in_label,
+                    loop_out_label,
                 );
                 index_map = index_map_new.clone();
                 idx = idx_new;
@@ -203,15 +380,34 @@ pub fn gen_block(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isiz
                 stmts.push_str(&s);
             }
             NodeType::Stmt(StmtType::Compound) => {
-                stmts.push_str(&gen_block(it, &index_map, idx));
+                stmts.push_str(&gen_block(
+                    it,
+                    &index_map,
+                    idx,
+                    loop_in_label,
+                    loop_out_label,
+                    true
+                ));
             }
             _ => {
-                let s = gen_stmt(it, &index_map, idx, &label_begin_block, &label_end_block);
+                let s = gen_stmt(
+                    it,
+                    &index_map,
+                    idx,
+                    &label_begin_block,
+                    &label_end_block,
+                    loop_in_label,
+                    loop_out_label,
+                );
                 stmts.push_str(&s);
             }
         }
     }
-    let b_deallocate = 8 * scope.len(); // deallocate stack
+    let b_deallocate = match flag {
+        true => 8 * scope.len(),
+        false => 0,
+    };
+    // let b_deallocate = 8 * scope.len(); // deallocate stack
     format!(
         "{}:\n\
          {}\
@@ -227,6 +423,8 @@ pub fn gen_stmt(
     idx: isize,
     lbb: &str, // label_begin_block
     leb: &str, // label_end_block
+    loop_in_label: Option<&str>,
+    loop_out_label: Option<&str>,
 ) -> String {
     let p = "        ".to_string(); // 8 white spaces
     match &tree.entry {
@@ -241,6 +439,8 @@ pub fn gen_stmt(
                     idx,
                     lbb,
                     leb,
+                    loop_in_label,
+                    loop_out_label,
                 )
             } else if tree.child.len() == 3 {
                 // <logical-or-exp> "?" <exp> ":" <conditional-exp>
@@ -250,6 +450,8 @@ pub fn gen_stmt(
                     idx,
                     lbb,
                     leb,
+                    loop_in_label,
+                    loop_out_label,
                 );
                 let e2_as = gen_stmt(
                     tree.child.get(1).expect("conditional expression no e2"),
@@ -257,6 +459,8 @@ pub fn gen_stmt(
                     idx,
                     lbb,
                     leb,
+                    loop_in_label,
+                    loop_out_label,
                 );
                 let e3_as = gen_stmt(
                     tree.child.get(2).expect("conditional expression no e3"),
@@ -264,6 +468,8 @@ pub fn gen_stmt(
                     idx,
                     lbb,
                     leb,
+                    loop_in_label,
+                    loop_out_label,
                 );
 
                 let label_e3 = gen_labels(format!("E3"));
@@ -293,7 +499,9 @@ pub fn gen_stmt(
                     index_map,
                     idx,
                     lbb,
-                    leb
+                    leb,
+                    loop_in_label,
+                    loop_out_label,
                 ),
                 gen_fn_epilogue(),
                 p
@@ -305,6 +513,8 @@ pub fn gen_stmt(
                     idx,
                     lbb,
                     leb,
+                    loop_in_label,
+                    loop_out_label,
                 );
                 let s1_as = gen_stmt(
                     tree.child.get(1).expect("conditional node no s1"),
@@ -312,6 +522,8 @@ pub fn gen_stmt(
                     idx,
                     lbb,
                     leb,
+                    loop_in_label,
+                    loop_out_label,
                 );
                 let s2_as: String = if tree.child.len() == 2 {
                     "".to_string()
@@ -322,6 +534,8 @@ pub fn gen_stmt(
                         idx,
                         lbb,
                         leb,
+                        loop_in_label,
+                        loop_out_label,
                     )
                 };
                 let label_s2 = gen_labels(format!("S2"));
@@ -344,15 +558,18 @@ pub fn gen_stmt(
                 idx,
                 lbb,
                 leb,
+                loop_in_label,
+                loop_out_label,
             ),
-            StmtType::Continue => format!("{}jmp {}\n", p, lbb),
-            StmtType::Break => format!("{}jmp {}\n", p, leb),
-            StmtType::For => {
-                panic!("for not implemented");
-            }
-            StmtType::ForDecl => {
-                panic!("fordecl not implemented");
-            }
+            StmtType::Continue => match loop_in_label {
+                Some(l) => format!("{}jmp {} # Continue\n", p, l),
+                None => panic!("Continue should be in the loop scope"),
+            },
+            StmtType::Break => match loop_out_label {
+                Some(l) => format!("{}jmp {} # Break\n", p, l),
+                None => panic!("Break shoule be in the loop scope"),
+            },
+            StmtType::For | StmtType::ForDecl => gen_for(tree, index_map, idx),
             StmtType::Do => {
                 // LBB.
                 // stmt
@@ -362,8 +579,23 @@ pub fn gen_stmt(
                 // LEB
                 let lbb = gen_labels("BDO".to_string());
                 let leb = gen_labels("EDO".to_string());
-                let stmts = gen_block(tree.child.get(0).unwrap(), index_map, idx); // should enter a new scope
-                let exp = gen_stmt(tree.child.get(1).unwrap(), index_map, idx, &lbb, &leb);
+                let stmts = gen_block(
+                    tree.child.get(0).unwrap(),
+                    index_map,
+                    idx,
+                    loop_in_label,
+                    loop_out_label,
+                    true
+                ); // should enter a new scope
+                let exp = gen_stmt(
+                    tree.child.get(1).unwrap(),
+                    index_map,
+                    idx,
+                    &lbb,
+                    &leb,
+                    Some(&lbb),
+                    Some(&leb),
+                );
                 format!(
                     "{}:\n\
                      {}\
@@ -385,8 +617,23 @@ pub fn gen_stmt(
                 let lbb = gen_labels("BWHILE".to_string());
                 let leb = gen_labels("EWHILE".to_string());
 
-                let exp = gen_stmt(tree.child.get(0).unwrap(), index_map, idx, &lbb, &leb);
-                let stmts = gen_block(tree.child.get(1).unwrap(), index_map, idx); // should enter a new scope
+                let exp = gen_stmt(
+                    tree.child.get(0).unwrap(),
+                    index_map,
+                    idx,
+                    &lbb,
+                    &leb,
+                    Some(&lbb),
+                    Some(&leb),
+                );
+                let stmts = gen_block(
+                    tree.child.get(1).unwrap(),
+                    index_map,
+                    idx,
+                    Some(&lbb),
+                    Some(&leb),
+                    true
+                ); // should enter a new scope
                 format!(
                     "{}:\n\
                      {}\
@@ -398,7 +645,8 @@ pub fn gen_stmt(
                     lbb, exp, p, p, leb, stmts, p, lbb, leb
                 )
             }
-            StmtType::Compound => gen_block(tree, index_map, idx),
+            StmtType::Compound =>
+                gen_block(tree, index_map, idx, loop_in_label, loop_out_label, true),
         },
         NodeType::AssignNode(var_name) => {
             match index_map.get(var_name) {
@@ -412,6 +660,8 @@ pub fn gen_stmt(
                         idx,
                         lbb,
                         leb,
+                        loop_in_label,
+                        loop_out_label,
                     );
                     let get_result = index_map.get(var_name);
                     let mut va_offset: isize = -8;
@@ -442,7 +692,9 @@ pub fn gen_stmt(
                     index_map,
                     idx,
                     lbb,
-                    leb
+                    leb,
+                    loop_in_label,
+                    loop_out_label,
                 ),
                 p
             ),
@@ -454,7 +706,9 @@ pub fn gen_stmt(
                     index_map,
                     idx,
                     lbb,
-                    leb
+                    leb,
+                    loop_in_label,
+                    loop_out_label,
                 ),
                 p
             ),
@@ -468,7 +722,9 @@ pub fn gen_stmt(
                     index_map,
                     idx,
                     lbb,
-                    leb
+                    leb,
+                    loop_in_label,
+                    loop_out_label,
                 ),
                 p,
                 p,
@@ -494,7 +750,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     gen_stmt(
@@ -502,7 +760,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     p
@@ -519,7 +779,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     gen_stmt(
@@ -527,7 +789,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     p
@@ -543,7 +807,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     gen_stmt(
@@ -551,7 +817,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     p
@@ -569,7 +837,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     gen_stmt(
@@ -577,7 +847,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     p,
@@ -596,7 +868,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     gen_stmt(
@@ -604,7 +878,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     p,
@@ -624,7 +900,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     gen_stmt(
@@ -632,7 +910,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     p,
@@ -652,7 +932,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     gen_stmt(
@@ -660,7 +942,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     p,
@@ -680,7 +964,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     gen_stmt(
@@ -688,7 +974,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     p,
@@ -715,7 +1003,9 @@ pub fn gen_stmt(
                             index_map,
                             idx,
                             lbb,
-                            leb
+                            leb,
+                            loop_in_label,
+                            loop_out_label,
                         ),
                         p,
                         p,
@@ -729,7 +1019,9 @@ pub fn gen_stmt(
                             index_map,
                             idx,
                             lbb,
-                            leb
+                            leb,
+                            loop_in_label,
+                            loop_out_label,
                         ),
                         p,
                         p,
@@ -756,7 +1048,9 @@ pub fn gen_stmt(
                             index_map,
                             idx,
                             lbb,
-                            leb
+                            leb,
+                            loop_in_label,
+                            loop_out_label,
                         ),
                         p,
                         p,
@@ -769,7 +1063,9 @@ pub fn gen_stmt(
                             index_map,
                             idx,
                             lbb,
-                            leb
+                            leb,
+                            loop_in_label,
+                            loop_out_label,
                         ),
                         p,
                         p,
@@ -790,7 +1086,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     gen_stmt(
@@ -798,7 +1096,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     p,
@@ -818,7 +1118,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     gen_stmt(
@@ -826,7 +1128,9 @@ pub fn gen_stmt(
                         index_map,
                         idx,
                         lbb,
-                        leb
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
                     ),
                     p,
                     p,
@@ -860,10 +1164,13 @@ pub fn gen_stmt(
                     idx,
                     lbb,
                     leb,
+                    loop_in_label,
+                    loop_out_label,
                 )
             } else {
                 // null exp
-                format!("")
+                // movq 1, %rax
+                format!("{}movq $1, %rax\n", p)
             }
         }
         NodeType::EqualityExp
@@ -882,6 +1189,8 @@ pub fn gen_stmt(
             idx,
             lbb,
             leb,
+            loop_in_label,
+            loop_out_label,
         ),
         _ => panic!(format!(
             "Node `{:?}` not implemented in gen::gen_stmt()\n",

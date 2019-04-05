@@ -2,7 +2,8 @@
 # build the project
 cargo build
 rm gen/*.s
-
+srcdir=test/valid
+dstdir=gen
 # now just test whether the number returned was right
 RED='\033[0;31m'
 BLUE='\033[0;34m'
@@ -26,7 +27,7 @@ test_fun() {
         echo -e "[${BLUE}Passed${NC}]"
     else
         echo -e "[${RED}Error${NC}]"
-        exit 1
+        # exit 1
     fi
 }
 src=test/valid/multi_digit.c
@@ -137,8 +138,6 @@ src=test/valid/unop_parens.c
 dst=gen/unop_parens.s
 test_fun $src $dst
 
-srcdir=test/valid
-dstdir=gen
 
 src=$srcdir/and_false.c
 dst=$dstdir/and_false.s
@@ -352,18 +351,57 @@ src=$srcdir/nested_scope_2.c
 dst=$dstdir/nested_scope_2.s
 test_fun $src $dst
 
-src=$srcdir/while_multi_statement.c
-dst=$dstdir/while_multi_statement.s
+
+
+src=$srcdir/break.c
+dst=$dstdir/break.s
+test_fun $src $dst
+src=$srcdir/continue.c
+dst=$dstdir/continue.s
+test_fun $src $dst
+src=$srcdir/continue_empty_post.c
+dst=$dstdir/continue_empty_post.s
+test_fun $src $dst
+src=$srcdir/do_while.c
+dst=$dstdir/do_while.s
+test_fun $src $dst
+src=$srcdir/empty_expression.c
+dst=$dstdir/empty_expression.s
+test_fun $src $dst
+src=$srcdir/for.c
+dst=$dstdir/for.s
+test_fun $src $dst
+src=$srcdir/for_decl.c
+dst=$dstdir/for_decl.s
+test_fun $src $dst
+src=$srcdir/for_empty.c
+dst=$dstdir/for_empty.s
+test_fun $src $dst
+src=$srcdir/for_nested_scope.c
+dst=$dstdir/for_nested_scope.s
+test_fun $src $dst
+src=$srcdir/for_variable_shadow.c
+dst=$dstdir/for_variable_shadow.s
+test_fun $src $dst
+src=$srcdir/nested_while_2.c
+dst=$dstdir/nested_while_2.s
+test_fun $src $dst
+src=$srcdir/nested_for.c
+dst=$dstdir/nested_for.s
 test_fun $src $dst
 
-
-src=$srcdir/while_single_statement.c
-dst=$dstdir/while_single_statement.s
+src=$srcdir/nested_break.c
+dst=$dstdir/nested_break.s
 test_fun $src $dst
-
+src=$srcdir/nested_while.c
+dst=$dstdir/nested_while.s
+test_fun $src $dst
 src=$srcdir/return_in_while.c
 dst=$dstdir/return_in_while.s
 test_fun $src $dst
-
-
-
+src=$srcdir/while_multi_statement.c
+dst=$dstdir/while_multi_statement.s
+test_fun $src $dst
+src=$srcdir/while_single_statement.c
+dst=$dstdir/while_single_statement.s
+test_fun $src $dst

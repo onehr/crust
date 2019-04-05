@@ -512,7 +512,6 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
             let pos = pos + 1;
             let (next_stmt_node, pos) = r#try!(p_stmt(toks, pos));
             stmt_node.child.push(next_stmt_node);
-            println!("1");
             // parse while
             if pos >= toks.len() || toks[pos] != lexer::TokType::Kwd(lexer::KwdType::While) {
                 return Err(format!("Missing `while` needed by do"));
@@ -555,6 +554,7 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
             if pos >= toks.len() || toks[pos] != lexer::TokType::Semicolon {
                 return Err(format!("Missing `;` needed by break"));
             }
+            let pos = pos + 1;
             return Ok((stmt_node, pos));
         }
         _ => {
