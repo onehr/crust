@@ -20,6 +20,7 @@ Now I will mainly focus on how to use Rust and build the basic structures.
 6. Support `if` `else`, and `exp1 ? exp2 : exp3`
 7. Support local scope binding now.
 8. Support `for`, `while`, `do`, `break`, `continue` now.
+9. Support function now!
 
 ## Build
 First you need to setup your rust enviroment to build crust compiler, you need also gcc to trasnlate the assembly code to binary.
@@ -44,10 +45,140 @@ $ ./test.sh
 ## Usage
 Cause now it's just in bare-metal development stage, so now it only supports little features.
 
-You can write only a main function with no input.
-and this function will only contains local variables declaration, assignment, and expression.
+You can define your own function now, but main function can not take input arguments.
+So you can write something like this.
+```c
+int fib(int n) {
+    if (n == 0 || n == 1) {
+        return n;
+    } else {
+        return fib(n - 1) + fib(n - 2);
+    }
+}
 
-Now You can write some thing like this.
+int main() {
+    int n = 5;
+    return fib(n);
+}
+```
+The generated code would be some thing like this:
+```assembly
+        .file "test/valid/fib.c"
+        .global fib
+        .type fib, @function
+fib:
+.LFB0:
+        .cfi_startproc
+        pushq	%rbp
+        .cfi_def_cfa_offset 16
+        .cfi_offset 6, -16
+        movq	%rsp, %rbp
+        .cfi_def_cfa_register 6
+.LBB1:
+        movq 16(%rbp), %rax
+        pushq %rax
+        movq $0, %rax
+        popq %rcx
+        cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise
+        movq $0, %rax   # zero out EAX, does not change flag
+        sete %al
+        cmpq $0, %rax
+        je .LCLAUSE3
+        movq $1, %rax
+        jmp .LEND4
+.LCLAUSE3:
+        movq 16(%rbp), %rax
+        pushq %rax
+        movq $1, %rax
+        popq %rcx
+        cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise
+        movq $0, %rax   # zero out EAX, does not change flag
+        sete %al
+        cmpq $0, %rax
+        movq $0, %rax
+        setne %al
+.LEND4: # end of clause here
+        cmpq $0, %rax
+        je .LS29
+.LBB5:
+        movq 16(%rbp), %rax
+        movq %rbp, %rsp
+        popq	%rbp
+        .cfi_def_cfa 7, 8
+        ret
+.LEB6:
+        addq $0, %rsp # block out
+        jmp .LENDIF10
+.LS29:
+.LBB7:
+        movq $1, %rax
+        pushq %rax
+        movq 16(%rbp), %rax
+        popq %rcx
+        subq %rcx, %rax
+        pushq %rax
+        call fib
+        addq $8, %rsp # remove the arguments
+        pushq %rax
+        movq $2, %rax
+        pushq %rax
+        movq 16(%rbp), %rax
+        popq %rcx
+        subq %rcx, %rax
+        pushq %rax
+        call fib
+        addq $8, %rsp # remove the arguments
+        popq %rcx
+        addq %rcx, %rax
+        movq %rbp, %rsp
+        popq	%rbp
+        .cfi_def_cfa 7, 8
+        ret
+.LEB8:
+        addq $0, %rsp # block out
+.LENDIF10:
+.LEB2:
+        addq $0, %rsp # block out
+        movq %rbp, %rsp
+        popq	%rbp
+        .cfi_def_cfa 7, 8
+        .cfi_endproc
+.LFE11:
+        .size   fib, .-fib
+        .global main
+        .type main, @function
+main:
+.LFB12:
+        .cfi_startproc
+        pushq	%rbp
+        .cfi_def_cfa_offset 16
+        .cfi_offset 6, -16
+        movq	%rsp, %rbp
+        .cfi_def_cfa_register 6
+.LBB13:
+        movq $5, %rax
+        pushq %rax
+        movq -8(%rbp), %rax
+        pushq %rax
+        call fib
+        addq $8, %rsp # remove the arguments
+        movq %rbp, %rsp
+        popq	%rbp
+        .cfi_def_cfa 7, 8
+        ret
+.LEB14:
+        addq $8, %rsp # block out
+        movq %rbp, %rsp
+        popq	%rbp
+        .cfi_def_cfa 7, 8
+        .cfi_endproc
+.LFE15:
+        .size   main, .-main
+        .ident	"crust: 0.1 (By Haoran Wang)"
+        .section	.note.GNU-stack,"",@progbits
+```
+
+Now You can also write some `for`, `while`, `do`, `break`, `continue` structure like this.
 ```c
 int main() {
         int ans = 0;
