@@ -16,7 +16,7 @@ test_fun() {
     ./a.out
     a=$?
     rm a.out
-    gcc -o b.out $1
+    gcc -std=c99 -o b.out $1
     ./b.out
     b=$?
     rm b.out
@@ -27,7 +27,7 @@ test_fun() {
         echo -e "[${BLUE}Passed${NC}]"
     else
         echo -e "[${RED}Error${NC}]"
-        # exit 1
+        exit 1
     fi
 }
 src=test/valid/multi_digit.c
