@@ -1,12 +1,15 @@
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum KwdType {
-    Int,   // int
-    Void,  // void
-    Ret,   // return
-    If,    // if
-    Else,  // else
-    While, // while
-    For,   // for
+    Int,      // int
+    Void,     // void
+    Ret,      // return
+    If,       // if
+    Else,     // else
+    While,    // while
+    For,      // for
+    Do,       // do
+    Break,    // break
+    Continue, // continue
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -81,6 +84,9 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
                     "else" => result.push(TokType::Kwd(KwdType::Else)),
                     "while" => result.push(TokType::Kwd(KwdType::While)),
                     "for" => result.push(TokType::Kwd(KwdType::For)),
+                    "do" => result.push(TokType::Kwd(KwdType::Do)),
+                    "continue" => result.push(TokType::Kwd(KwdType::Continue)),
+                    "break" => result.push(TokType::Kwd(KwdType::Break)),
                     _ => result.push(TokType::Identifier(s)),
                 }
             }

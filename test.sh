@@ -351,3 +351,19 @@ test_fun $src $dst
 src=$srcdir/nested_scope_2.c
 dst=$dstdir/nested_scope_2.s
 test_fun $src $dst
+
+src=$srcdir/while_multi_statement.c
+dst=$dstdir/while_multi_statement.s
+test_fun $src $dst
+
+
+src=$srcdir/while_single_statement.c
+dst=$dstdir/while_single_statement.s
+test_fun $src $dst
+
+src=$srcdir/return_in_while.c
+dst=$dstdir/return_in_while.s
+test_fun $src $dst
+
+
+

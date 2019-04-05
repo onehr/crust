@@ -123,6 +123,8 @@ pub fn gen_declare(
     index_map: &HashMap<String, isize>,
     scope: &HashSet<String>,
     idx: isize,
+    lbb: &str,
+    leb: &str,
 ) -> (HashMap<String, isize>, HashSet<String>, isize, String) {
     let p = "        ";
     let mut index_map = index_map.clone();
@@ -157,6 +159,8 @@ pub fn gen_declare(
                         .expect("Statement::Declare Node has no child"),
                     &index_map,
                     idx,
+                    lbb,
+                    leb,
                 )
             }
             let s = format!(
@@ -173,10 +177,10 @@ pub fn gen_declare(
 /// gen_block() - into a new block, will have empty scope
 pub fn gen_block(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize) -> String {
     let p = "        ".to_string(); // 8 white spaces
-
+    let label_begin_block = gen_labels("BB".to_string());
+    let label_end_block = gen_labels("EB".to_string());
     // iter every block
     let mut stmts = String::new();
-    //let idx: &mut isize = &mut -8;
     let mut index_map = index_map.clone();
     let mut idx: isize = idx;
     let mut scope: HashSet<String> = HashSet::new();
@@ -185,8 +189,14 @@ pub fn gen_block(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isiz
         // iter through every block-item
         match &it.entry {
             NodeType::Declare(_var_name) => {
-                let (index_map_new, scope_new, idx_new, s) =
-                    gen_declare(it, &index_map, &scope, idx);
+                let (index_map_new, scope_new, idx_new, s) = gen_declare(
+                    it,
+                    &index_map,
+                    &scope,
+                    idx,
+                    &label_begin_block,
+                    &label_end_block,
+                );
                 index_map = index_map_new.clone();
                 idx = idx_new;
                 scope = scope_new.clone();
@@ -196,20 +206,28 @@ pub fn gen_block(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isiz
                 stmts.push_str(&gen_block(it, &index_map, idx));
             }
             _ => {
-                let s = gen_stmt(it, &index_map, idx);
+                let s = gen_stmt(it, &index_map, idx, &label_begin_block, &label_end_block);
                 stmts.push_str(&s);
             }
         }
     }
     let b_deallocate = 8 * scope.len(); // deallocate stack
     format!(
-        "{}\
+        "{}:\n\
+         {}\
+         {}:\n\
          {}addq ${}, %rsp\n",
-        stmts, p, b_deallocate
+        label_begin_block, stmts, label_end_block, p, b_deallocate
     )
 }
 
-pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize) -> String {
+pub fn gen_stmt(
+    tree: &ParseNode,
+    index_map: &HashMap<String, isize>,
+    idx: isize,
+    lbb: &str, // label_begin_block
+    leb: &str, // label_end_block
+) -> String {
     let p = "        ".to_string(); // 8 white spaces
     match &tree.entry {
         NodeType::ConditionalExp => {
@@ -221,6 +239,8 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                         .expect("Conditional Expression has no child"),
                     index_map,
                     idx,
+                    lbb,
+                    leb,
                 )
             } else if tree.child.len() == 3 {
                 // <logical-or-exp> "?" <exp> ":" <conditional-exp>
@@ -228,16 +248,22 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                     tree.child.get(0).expect("Conditional expression no e1"),
                     index_map,
                     idx,
+                    lbb,
+                    leb,
                 );
                 let e2_as = gen_stmt(
                     tree.child.get(1).expect("conditional expression no e2"),
                     index_map,
                     idx,
+                    lbb,
+                    leb,
                 );
                 let e3_as = gen_stmt(
                     tree.child.get(2).expect("conditional expression no e3"),
                     index_map,
                     idx,
+                    lbb,
+                    leb,
                 );
 
                 let label_e3 = gen_labels(format!("E3"));
@@ -265,7 +291,9 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                 gen_stmt(
                     tree.child.get(0).expect("Statement node no child"),
                     index_map,
-                    idx
+                    idx,
+                    lbb,
+                    leb
                 ),
                 gen_fn_epilogue(),
                 p
@@ -275,11 +303,15 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                     tree.child.get(0).expect("Conditional node no e1"),
                     index_map,
                     idx,
+                    lbb,
+                    leb,
                 );
                 let s1_as = gen_stmt(
                     tree.child.get(1).expect("conditional node no s1"),
                     index_map,
                     idx,
+                    lbb,
+                    leb,
                 );
                 let s2_as: String = if tree.child.len() == 2 {
                     "".to_string()
@@ -288,6 +320,8 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                         tree.child.get(2).expect("conditional node no s2"),
                         index_map,
                         idx,
+                        lbb,
+                        leb,
                     )
                 };
                 let label_s2 = gen_labels(format!("S2"));
@@ -308,9 +342,63 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                 tree.child.get(0).expect("Statement Node no child"),
                 index_map,
                 idx,
+                lbb,
+                leb,
             ),
+            StmtType::Continue => format!("{}jmp {}\n", p, lbb),
+            StmtType::Break => format!("{}jmp {}\n", p, leb),
+            StmtType::For => {
+                panic!("for not implemented");
+            }
+            StmtType::ForDecl => {
+                panic!("fordecl not implemented");
+            }
+            StmtType::Do => {
+                // LBB.
+                // stmt
+                // exp
+                // cmpq $1, %rax
+                // je  LBB
+                // LEB
+                let lbb = gen_labels("BDO".to_string());
+                let leb = gen_labels("EDO".to_string());
+                let stmts = gen_block(tree.child.get(0).unwrap(), index_map, idx); // should enter a new scope
+                let exp = gen_stmt(tree.child.get(1).unwrap(), index_map, idx, &lbb, &leb);
+                format!(
+                    "{}:\n\
+                     {}\
+                     {}\
+                     {}cmpq $1, %rax\n\
+                     {}je   {}\n\
+                     {}:\n",
+                    lbb, stmts, exp, p, p, lbb, leb
+                )
+            }
+            StmtType::While => {
+                // LBB.
+                // exp
+                // cmpq $1, %rax
+                // jne LEB
+                // stmt
+                // jmp LBB
+                // LEB.
+                let lbb = gen_labels("BWHILE".to_string());
+                let leb = gen_labels("EWHILE".to_string());
+
+                let exp = gen_stmt(tree.child.get(0).unwrap(), index_map, idx, &lbb, &leb);
+                let stmts = gen_block(tree.child.get(1).unwrap(), index_map, idx); // should enter a new scope
+                format!(
+                    "{}:\n\
+                     {}\
+                     {}cmpq $1, %rax\n\
+                     {}jne {}\n\
+                     {}\
+                     {}jmp {}\n\
+                     {}:\n",
+                    lbb, exp, p, p, leb, stmts, p, lbb, leb
+                )
+            }
             StmtType::Compound => gen_block(tree, index_map, idx),
-            _ => panic!("Compound should not occur here"),
         },
         NodeType::AssignNode(var_name) => {
             match index_map.get(var_name) {
@@ -322,6 +410,8 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                             .expect("Statement::Declare Node has no child"),
                         index_map,
                         idx,
+                        lbb,
+                        leb,
                     );
                     let get_result = index_map.get(var_name);
                     let mut va_offset: isize = -8;
@@ -350,7 +440,9 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                 gen_stmt(
                     tree.child.get(0).expect("UnExp<-> no child"),
                     index_map,
-                    idx
+                    idx,
+                    lbb,
+                    leb
                 ),
                 p
             ),
@@ -360,7 +452,9 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                 gen_stmt(
                     tree.child.get(0).expect("UnExp<~> no child"),
                     index_map,
-                    idx
+                    idx,
+                    lbb,
+                    leb
                 ),
                 p
             ),
@@ -372,7 +466,9 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                 gen_stmt(
                     tree.child.get(0).expect("UnExp<!> node no child"),
                     index_map,
-                    idx
+                    idx,
+                    lbb,
+                    leb
                 ),
                 p,
                 p,
@@ -396,13 +492,17 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                     gen_stmt(
                         tree.child.get(0).expect("BinExp has no lhs"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     gen_stmt(
                         tree.child.get(1).expect("BinExp has no rhs"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     p
@@ -417,13 +517,17 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                     gen_stmt(
                         tree.child.get(1).expect("BinExp has no rhs"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     gen_stmt(
                         tree.child.get(0).expect("BinExp has no lhs"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     p
@@ -437,13 +541,17 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                     gen_stmt(
                         tree.child.get(0).expect("BinExp has no lhs"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     gen_stmt(
                         tree.child.get(1).expect("BinExp has no rhs"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     p
@@ -459,13 +567,17 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                     gen_stmt(
                         tree.child.get(1).expect("BinExp has no rhs"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     gen_stmt(
                         tree.child.get(0).expect("BinExp has no lhs"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     p,
@@ -482,13 +594,17 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                     gen_stmt(
                         tree.child.get(0).expect("BinExp<==> node no child"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     gen_stmt(
                         tree.child.get(1).expect("BinExp<==> node no child"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     p,
@@ -506,13 +622,17 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                     gen_stmt(
                         tree.child.get(0).expect("BinExp<==> node no child"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     gen_stmt(
                         tree.child.get(1).expect("BinExp<==> node no child"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     p,
@@ -530,13 +650,17 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                     gen_stmt(
                         tree.child.get(0).expect("BinExp<==> node no child"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     gen_stmt(
                         tree.child.get(1).expect("BinExp<==> node no child"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     p,
@@ -554,13 +678,17 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                     gen_stmt(
                         tree.child.get(0).expect("BinExp<==> node no child"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     gen_stmt(
                         tree.child.get(1).expect("BinExp<==> node no child"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     p,
@@ -585,7 +713,9 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                         gen_stmt(
                             tree.child.get(0).expect("BinExp<||> node no child"),
                             index_map,
-                            idx
+                            idx,
+                            lbb,
+                            leb
                         ),
                         p,
                         p,
@@ -597,7 +727,9 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                         gen_stmt(
                             tree.child.get(1).expect("BinExp<||> node no child"),
                             index_map,
-                            idx
+                            idx,
+                            lbb,
+                            leb
                         ),
                         p,
                         p,
@@ -622,7 +754,9 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                         gen_stmt(
                             tree.child.get(0).expect("BinExp<||> node no child"),
                             index_map,
-                            idx
+                            idx,
+                            lbb,
+                            leb
                         ),
                         p,
                         p,
@@ -633,7 +767,9 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                         gen_stmt(
                             tree.child.get(1).expect("BinExp<||> node no child"),
                             index_map,
-                            idx
+                            idx,
+                            lbb,
+                            leb
                         ),
                         p,
                         p,
@@ -652,13 +788,17 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                     gen_stmt(
                         tree.child.get(0).expect("BinExp<==> node no child"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     gen_stmt(
                         tree.child.get(1).expect("BinExp<==> node no child"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     p,
@@ -676,13 +816,17 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                     gen_stmt(
                         tree.child.get(0).expect("BinExp<==> node no child"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     gen_stmt(
                         tree.child.get(1).expect("BinExp<==> node no child"),
                         index_map,
-                        idx
+                        idx,
+                        lbb,
+                        leb
                     ),
                     p,
                     p,
@@ -706,6 +850,22 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                 None => panic!(format!("Use of undeclared variable `{}`", var_name)),
             }
         }
+        NodeType::ExpOption => {
+            if tree.child.len() == 1 {
+                gen_stmt(
+                    tree.child
+                        .get(0)
+                        .expect(&format!("{:?} node no child", &tree.entry)),
+                    index_map,
+                    idx,
+                    lbb,
+                    leb,
+                )
+            } else {
+                // null exp
+                format!("")
+            }
+        }
         NodeType::EqualityExp
         | NodeType::RelationalExp
         | NodeType::Term
@@ -720,6 +880,8 @@ pub fn gen_stmt(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize
                 .expect(&format!("{:?} node no child", &tree.entry)),
             index_map,
             idx,
+            lbb,
+            leb,
         ),
         _ => panic!(format!(
             "Node `{:?}` not implemented in gen::gen_stmt()\n",

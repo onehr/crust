@@ -6,9 +6,15 @@ pub enum NodeType {
     Fn(String, Option<Box<NodeType>>), // <function> ::= "int" <id> "(" ")" "{" {<block-item>} "}"
     Stmt(StmtType),
     // <statement> ::= "return" <exp> ";"
-    //               | <exp> ;
+    //               | <exp-option> ";"
     //               | "if" "(" <exp> ")" <statement> [ "else" <statement> ]
-    //               | "{" { <block-item> } "}"
+    //               | "{" { <block-item> } "}
+    //               | "for" "(" <exp-option> ";" <exp-option> ";" <exp-option> ")" <statement>
+    //               | "for" "(" <declaration> <exp-option> ";" <exp-option> ")" <statement>
+    //               | "while" "(" <exp> ")" <statement>
+    //               | "do" <statement> "while" <exp> ";"
+    //               | "break" ";"
+    //               | "continue" ";"
     Block, // <block> ::= <statement> | <declaration>
     Const(i64),
     Var(String),
@@ -16,6 +22,7 @@ pub enum NodeType {
     UnExp(lexer::TokType),  // Unary Expression
     BinExp(lexer::TokType), // Binary Operator
     Exp,                    // <exp> ::= <id> "=" <exp> | <conditional-exp>
+    ExpOption,              // <exp-option> :: <exp> | ""
     ConditionalExp, // <conditional-exp> ::= <logical-or-exp> [ "?" <exp> ":" <conditional-exp> ]
     LogicalOrExp,   // <logical-or-exp> ::= <logical-and-exp> { "||" <logical-and-exp> }
     LogicalAndExp,  // <logical-and-exp> ::= <equality-exp> { "&&" <equality-exp> }
@@ -33,6 +40,12 @@ pub enum StmtType {
     Exp,
     Conditional(String),
     Compound,
+    For,     // kids: exp-opion, exp-option, exp-option
+    ForDecl, // kids: declaration, exp, exp-option, statement
+    While,   // kids: exp, stmt
+    Do,      // kids: stmt, exp
+    Break,
+    Continue,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -120,6 +133,24 @@ fn p_conditional_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNod
     }
 }
 
+fn p_exp_opt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
+    // <exp-option> ::= <exp> | ""
+    let mut exp_opt_node = ParseNode::new();
+    exp_opt_node.entry = NodeType::ExpOption;
+    let res = p_exp(toks, pos);
+    match res {
+        Ok((exp_node, pos)) => {
+            // <exp>
+            exp_opt_node.child.push(exp_node);
+            return Ok((exp_opt_node, pos));
+        }
+        Err(_) => {
+            // ""
+            // no child, means null statement
+            return Ok((exp_opt_node, pos));
+        }
+    }
+}
 fn p_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
     // println!("in fn: p_exp, with pos:{}", pos);
     // <exp> ::= <id> "=" <exp> | <conditional-exp>
@@ -384,19 +415,161 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
                 return Ok((stmt_node, pos));
             }
         }
+        lexer::TokType::Kwd(lexer::KwdType::For) => {
+            // "for" "(" <exp-option> ";" <exp-option> ";" <exp-option> ")" <statement>
+            // "for" "(" <declaration> <exp-option> ";" <exp-option> ")" <statement>
+            let mut stmt_node = ParseNode::new();
+            let pos = pos + 1;
+            if pos >= toks.len() || toks[pos] != lexer::TokType::LParen {
+                return Err(format!("Missing `(`"));
+            }
+            let pos = pos + 1;
+            // try to parse declaration
+            let decl_res = p_declare(toks, pos);
+            match decl_res {
+                Ok((declare_node, pos)) => {
+                    // "for" "(" <declaration> <exp-option> ";" <exp-option> ")" <statement>
+                    stmt_node.child.push(declare_node);
+                    stmt_node.entry = NodeType::Stmt(StmtType::ForDecl);
+
+                    let (exp_opt_node, pos) = r#try!(p_exp_opt(toks, pos));
+                    stmt_node.child.push(exp_opt_node);
+
+                    if pos >= toks.len() || toks[pos] != lexer::TokType::Semicolon {
+                        return Err(format!("Missing `;` needed by For"));
+                    }
+                    let pos = pos + 1;
+
+                    let (exp_opt_node, pos) = r#try!(p_exp_opt(toks, pos));
+                    stmt_node.child.push(exp_opt_node);
+                    if pos >= toks.len() || toks[pos] != lexer::TokType::RParen {
+                        return Err(format!("Missing `)` needed by For"));
+                    }
+                    let pos = pos + 1;
+
+                    let (next_stmt_node, pos) = r#try!(p_stmt(toks, pos));
+                    stmt_node.child.push(next_stmt_node);
+                    return Ok((stmt_node, pos));
+                }
+                Err(_) => {
+                    // "for" "(" <exp-option> ";" <exp-option> ";" <exp-option> ")" <statement>
+                    stmt_node.entry = NodeType::Stmt(StmtType::For);
+                    let (exp_opt_node, pos) = r#try!(p_exp_opt(toks, pos));
+                    stmt_node.child.push(exp_opt_node);
+
+                    if pos >= toks.len() || toks[pos] != lexer::TokType::Semicolon {
+                        return Err(format!("Missing `;` needed by for"));
+                    }
+                    let pos = pos + 1;
+
+                    let (exp_opt_node, pos) = r#try!(p_exp_opt(toks, pos));
+                    stmt_node.child.push(exp_opt_node);
+
+                    if pos >= toks.len() || toks[pos] != lexer::TokType::Semicolon {
+                        return Err(format!("Missing `;` needed by for"));
+                    }
+                    let pos = pos + 1;
+
+                    let (exp_opt_node, pos) = r#try!(p_exp_opt(toks, pos));
+                    stmt_node.child.push(exp_opt_node);
+
+                    if pos >= toks.len() || toks[pos] != lexer::TokType::RParen {
+                        return Err(format!("Missing `)` needed by for"));
+                    }
+                    let pos = pos + 1;
+
+                    let (next_stmt_node, pos) = r#try!(p_stmt(toks, pos));
+                    stmt_node.child.push(next_stmt_node);
+                    return Ok((stmt_node, pos));
+                }
+            }
+        }
+        lexer::TokType::Kwd(lexer::KwdType::While) => {
+            // "while" "(" <exp> ")" <statement>
+            let mut stmt_node = ParseNode::new();
+            stmt_node.entry = NodeType::Stmt(StmtType::While);
+            let pos = pos + 1;
+            if pos >= toks.len() || toks[pos] != lexer::TokType::LParen {
+                return Err(format!("Missing `(` needed by While"));
+            }
+
+            let pos = pos + 1;
+            let (exp_node, pos) = r#try!(p_exp(toks, pos));
+            stmt_node.child.push(exp_node);
+            if pos >= toks.len() || toks[pos] != lexer::TokType::RParen {
+                return Err(format!("Missing `)`"));
+            }
+            let pos = pos + 1;
+
+            let (next_stmt_node, pos) = r#try!(p_stmt(toks, pos));
+            stmt_node.child.push(next_stmt_node);
+            return Ok((stmt_node, pos));
+        }
+        lexer::TokType::Kwd(lexer::KwdType::Do) => {
+            // "do" <statement> "while" "(" <exp> ")" ";"
+            let mut stmt_node = ParseNode::new();
+            stmt_node.entry = NodeType::Stmt(StmtType::Do);
+            let pos = pos + 1;
+            let (next_stmt_node, pos) = r#try!(p_stmt(toks, pos));
+            stmt_node.child.push(next_stmt_node);
+            println!("1");
+            // parse while
+            if pos >= toks.len() || toks[pos] != lexer::TokType::Kwd(lexer::KwdType::While) {
+                return Err(format!("Missing `while` needed by do"));
+            }
+            let pos = pos + 1;
+
+            if pos >= toks.len() || toks[pos] != lexer::TokType::LParen {
+                return Err(format!("Missing `(` needed by do"));
+            }
+            let pos = pos + 1;
+
+            let (exp_node, pos) = r#try!(p_exp_opt(toks, pos));
+
+            if pos >= toks.len() || toks[pos] != lexer::TokType::RParen {
+                return Err(format!("Missing `)` needed by do"));
+            }
+            let pos = pos + 1;
+
+            if pos >= toks.len() || toks[pos] != lexer::TokType::Semicolon {
+                return Err(format!("Missing `;` needed by do"));
+            }
+            let pos = pos + 1;
+
+            stmt_node.child.push(exp_node);
+            return Ok((stmt_node, pos));
+        }
+        lexer::TokType::Kwd(lexer::KwdType::Continue) => {
+            let mut stmt_node = ParseNode::new();
+            stmt_node.entry = NodeType::Stmt(StmtType::Continue);
+            let pos = pos + 1;
+            if pos >= toks.len() || toks[pos] != lexer::TokType::Semicolon {
+                return Err(format!("Missing `;` needed by continue"));
+            }
+            return Ok((stmt_node, pos));
+        }
+        lexer::TokType::Kwd(lexer::KwdType::Break) => {
+            let mut stmt_node = ParseNode::new();
+            stmt_node.entry = NodeType::Stmt(StmtType::Break);
+            let pos = pos + 1;
+            if pos >= toks.len() || toks[pos] != lexer::TokType::Semicolon {
+                return Err(format!("Missing `;` needed by break"));
+            }
+            return Ok((stmt_node, pos));
+        }
         _ => {
-            // try to parse exp;
+            // try to parse exp-option;
             let mut stmt_node = ParseNode::new();
             stmt_node.entry = NodeType::Stmt(StmtType::Exp);
             //let pos = pos + 1;
-            let (exp_node, pos) = r#try!(p_exp(toks, pos));
+            let (exp_opt_node, pos) = r#try!(p_exp_opt(toks, pos));
 
             let tok = &toks[pos];
             if *tok != lexer::TokType::Semicolon {
                 return Err(format!("Expected `;`, found {:?} at {}", toks[pos], pos));
             }
             let pos = pos + 1;
-            stmt_node.child.push(exp_node);
+            stmt_node.child.push(exp_opt_node);
             return Ok((stmt_node, pos));
         }
     }
@@ -799,6 +972,101 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
             )
         }
         NodeType::Stmt(stmt) => match stmt {
+            StmtType::For => {
+                let exp_opt_1 = print(tree.child.get(0).expect("No exp1 in for"), idt + 1);
+                let exp_opt_2 = print(tree.child.get(1).expect("No exp2 in for"), idt + 1);
+                let exp_opt_3 = print(tree.child.get(2).expect("No exp3 in for"), idt + 1);
+                let stmt = print(tree.child.get(3).expect("No stmt in for"), idt + 1);
+                format!(
+                    "{}n_type: Stmt:ForDeclare, [\n\
+                     {}declare: [\n{}\n{}]\n\
+                     {}exp1:    [\n{}\n{}]\n\
+                     {}exp2:    [\n{}\n{}]\n\
+                     {}stmt:    [\n{}\n{}]\n\
+                     {}]",
+                    idt_prefix,
+                    idt_prefix,
+                    exp_opt_1,
+                    idt_prefix,
+                    idt_prefix,
+                    exp_opt_2,
+                    idt_prefix,
+                    idt_prefix,
+                    exp_opt_3,
+                    idt_prefix,
+                    idt_prefix,
+                    stmt,
+                    idt_prefix,
+                    idt_prefix
+                )
+            }
+            StmtType::ForDecl => {
+                let d = print(tree.child.get(0).expect("No declaration in for"), idt + 1);
+                let exp_opt_1 = print(tree.child.get(1).expect("No exp1 in for"), idt + 1);
+                let exp_opt_2 = print(tree.child.get(2).expect("No exp2 in for"), idt + 1);
+                let stmt = print(tree.child.get(3).expect("No stmt in for"), idt + 1);
+
+                format!(
+                    "{}n_type: Stmt:ForDeclare, [\n\
+                     {}declare: [\n{}\n{}]\n\
+                     {}exp1:    [\n{}\n{}]\n\
+                     {}exp2:    [\n{}\n{}]\n\
+                     {}stmt:    [\n{}\n{}]\n\
+                     {}]",
+                    idt_prefix,
+                    idt_prefix,
+                    d,
+                    idt_prefix,
+                    idt_prefix,
+                    exp_opt_1,
+                    idt_prefix,
+                    idt_prefix,
+                    exp_opt_2,
+                    idt_prefix,
+                    idt_prefix,
+                    stmt,
+                    idt_prefix,
+                    idt_prefix
+                )
+            }
+            StmtType::Do => {
+                let stmt = print(tree.child.get(0).expect("No stmt in do"), idt + 1);
+                let exp = print(tree.child.get(1).expect("No exp in do"), idt + 1);
+                format!(
+                    "{}n_type: Stmt:Do, [\n\
+                     {}           stmt: [\n{}\n{}]\n\
+                     {}           exp:  [\n{}\n{}]\n\
+                     {}]",
+                    idt_prefix,
+                    idt_prefix,
+                    stmt,
+                    idt_prefix,
+                    idt_prefix,
+                    exp,
+                    idt_prefix,
+                    idt_prefix
+                )
+            }
+            StmtType::While => {
+                let exp = print(tree.child.get(0).expect("No stmt in do"), idt + 1);
+                let stmt = print(tree.child.get(1).expect("No exp in do"), idt + 1);
+                format!(
+                    "{}n_type: Stmt:While, [\n\
+                     {}               exp: [\n{}\n{}]\n\
+                     {}              stmt:  [\n{}\n{}]\n\
+                     {}]",
+                    idt_prefix,
+                    idt_prefix,
+                    exp,
+                    idt_prefix,
+                    idt_prefix,
+                    stmt,
+                    idt_prefix,
+                    idt_prefix
+                )
+            }
+            StmtType::Continue => format!("{}n_type: Continue", idt_prefix),
+            StmtType::Break => format!("{}n_type: Break", idt_prefix),
             StmtType::Return => format!(
                 "{}n_type: Stmt::Return, [\n{}\n{}]",
                 idt_prefix,
@@ -900,6 +1168,19 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
             ),
             idt_prefix
         ),
+        NodeType::ExpOption => match tree.child.len() {
+            0 => format!("{}n_type: ExpOption", idt_prefix),
+            1 => format!(
+                "{}n_type: ExpOption, [\n{}\n{}]",
+                idt_prefix,
+                print(tree.child.get(0).expect("ExpOption has no child"), idt + 1),
+                idt_prefix
+            ),
+            _ => panic!(format!(
+                "ExpOption can only have 0 or 1 child node, but found {} child node",
+                tree.child.len()
+            )),
+        },
         NodeType::Exp => format!(
             "{}n_type: Exp, [\n{}\n{}]",
             idt_prefix,
