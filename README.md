@@ -1,41 +1,72 @@
 # CRUST
 [![Build Status](https://travis-ci.com/onehr/crust.svg?branch=master)](https://travis-ci.com/onehr/crust)
 
-A simple C compiler written in Rust-lang.
+A simple C compiler written in Rust-lang from scratch, with no extra lib (only std in Rust).
 
 ## Project Goal
-Support C11 Standard, generate X86_64 Assembly Code from C source code.
+Support C11 Standard, generate `X86-64` Assembly Code from C source code.
+(Make sure you are testing it in 64 bit linux systems, now do not support 32-bit linux and macos
+(which will be implemented soon, cause I also got a mbp)).
 
-PS. Now this compiler is in his bare-metal stage, using it to develop was like using a stick to face the dragon.
-But I will keep developing it until it can compile real-world applications.
-Now I will mainly focus on how to use Rust and build the basic structures.
+PS. Now this compiler was in his very very-early stage(started at Mar 30, 2019), 
+but I plan to grow it until it can compile some real-world applications, not just simple function and hello-world, 
+So I will keep on learning and keep on updating this project.
+I think writing a compiler from scratch can learn a lot and it's lot of fun to do this, I can almost work on it continuously for a whole day
+if I have time :).
+
+This is not the first time I wrote small compiler, but this is the first time I wrote Rust project,
+So now I will mainly focus on how to use Rust better and build the basic compiler structures.
 
 ## Now Support
 **Cause now it's in development, so it only supports little features in C**.
-1. Local Variables declaration and assignment
-2. `return` statement
-3. Unary Operator: `!`, `~`, `-`(Negative)
-4. Binary Operator: `||`, `&&`, `<`, `>`, `>=`, `<=`, `==`, `+`, `-`, `/`, `*`
-5. Now only support int data type.
-6. Support `if` `else`, and `exp1 ? exp2 : exp3`
-7. Support local scope binding now.
-8. Support `for`, `while`, `do`, `break`, `continue` now.
-9. Support function now.
-10. Support global variables now.
+- local variables declaration and assignment, so you can write something like this.
+```c
+int main() {
+        int a = 10;
+        int b = 10;
+        int c = a + b;
+        return c;
+}
+```
+- Unary Operator: `!`(not), `~`(bitwise one's complement), `-`(negtive)
+- Binary Operator: `||`, `&&`, `<`, `>`, `>=`, `<=`, `==`, `+`, `-`, `/`, `*`
+- Now only support int data type (which is ).
+- Support `if` `else`, and `exp1 ? exp2 : exp3`
+e.g.
+```
+int a = 1 ? 0 : 1;
+```
+- Support local scope binding now.
+Variable value should be shadowed by the inner scope.
+- Support `for`, `while`, `do`, `break`, `continue` now.
+- Support function now. (must be defined before use).
+- Support global variables now. (must be declared  before use).
+
+## TODOLIST
+I will add my TODOLIST from my emacs org file soon.
+
+## Development Platform
+* Platform : Windows Linux Subsystem (Ubuntu on Windows) + rustc(1.33.0) + cargo(1.33.0) + Emacs
+* Toolchain: gcc 7.3.0
+I was using a Windows Subsystem to build the project and test it, it should also work at native Linux 64 bit system. But only in 64 bit system,
+cause the assembly file now generated follows x86-64 syntax (instrcutions end with `q` and registers start with `%r` can not compile in gcc -m32).
 
 ## Build
-First you need to setup your rust enviroment to build crust compiler, you need also gcc to trasnlate the assembly code to binary.
+First you need to setup your rust enviroment to build crust compiler, for this I recommend using `rustup` to install `rustc` and `cargo`.
+You should also have also gcc(my version is 7.3.0) as an assembler driver to trasnlate the assembly code to binary.
+
 ```bash
-$ cargo build
+$ cargo build # use this command to build the project
 ```
 You can run with
 ```bash
-$ cargo run source_file output_file
+$ cargo run source_file.c output_file.s # compile source_file.c => output_file.s
 ```
+
 You can get [output_file] as an assembly code file, which can be assembled into an ELF executable file.
 If you want to run the program, you should type:
 ```bash
-$ gcc -o a.out output_file
+$ gcc -o a.out output_file.s
 $ ./a.out
 $ echo $?
 ```
@@ -47,9 +78,6 @@ $ mkdir gen/
 $ ./test.sh
 ```
 
-## Development Platform
-* Platform : Windows Linux Subsystem (Ubuntu on Windows) + rustc(1.33.0) + cargo(1.33.0) + Emacs
-* Toolchain: gcc 7.3.0
 
 ## Usage Example
 Cause now it's just in bare-metal development stage, so now it only supports little features.
@@ -88,7 +116,7 @@ int main() {
         return EXIT_SUCCESS;
 }
 ```
-This is actually a unit test, it can test every function works correctly,
+This can actually be an unit test, it can test every function works correctly,
 if everything goes fine, this program should retrun `EXIT_SUCCESS`, if there's something wrong, it will return 1,
 which is `EXIT_FAILURE`.
 
