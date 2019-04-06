@@ -1,47 +1,61 @@
 # CRUST
 [![Build Status](https://travis-ci.com/onehr/crust.svg?branch=master)](https://travis-ci.com/onehr/crust)
 
-A simple C compiler written in Rust-lang.
+A simple C compiler written in the Rust-lang.
 
 ## Project Goal
-Support C11 Standard, generate X86_64 Assembly Code from C source code.
+Support C11 Standard and generate X86_64 Assembly Code from C source code.
 
-PS. Now this compiler is in his bare-metal stage, using it to develop was like using a stick to face the dragon.
-But I will keep developing it until it can compile real-world applications.
-Now I will mainly focus on how to use Rust and build the basic structures.
+This compiler is in a bare-metal state, using it to develop would be like using a stick to face a dragon.
+The plan is to developing it until it can compile real-world applications.
+At the moment the main focus is on how to use Rust and build the basic structures.
 
-## Now Support
-**Cause now it's in development, so it only supports little features in C**.
-1. Local Variables declaration and assignment
-2. `return` statement
-3. Unary Operator: `!`, `~`, `-`(Negative)
-4. Binary Operator: `||`, `&&`, `<`, `>`, `>=`, `<=`, `==`, `+`, `-`, `/`, `*`
-5. Now only support int data type.
-6. Support `if` `else`, and `exp1 ? exp2 : exp3`
-7. Support local scope binding now.
-8. Support `for`, `while`, `do`, `break`, `continue` now.
-9. Support function now.
-10. Support global variables now.
+## Currently Supports
+**Because of the Beta nature, crust supports few C features**.
+1. Local Variables, declaration and assignment.
+2. The `return` statement.
+3. Unary Operators: `!`, `~`, `-`(Negation).
+4. Binary Operators: `||`, `&&`, `<`, `>`, `>=`, `<=`, `==`, `+`, `-`, `/`, `*`.
+5. Ternary Operator: `exp1 ? exp2 : exp3`.
+5. `int` data type.
+6. `if` keyword.
+7. `else` keyword.
+8. `for` keyword.
+9. `while` keyword.
+10. `do` keyword.
+11. `break` keyword.
+12. `continue` keyword.
+14. Local scope binding.
+16. Function definition.
+17. Global variables.
+
+## Requirements
+
+You need a valid rust environment, Cargo, and gcc (7.3.0). Gcc is needed to translate the output assembly to binary code.
 
 ## Build
-First you need to setup your rust enviroment to build crust compiler, you need also gcc to trasnlate the assembly code to binary.
+
 ```bash
 $ cargo build
 ```
 You can run with
+
 ```bash
 $ cargo run source_file output_file
 ```
 You can get [output_file] as an assembly code file, which can be assembled into an ELF executable file.
 If you want to run the program, you should type:
+
 ```bash
 $ gcc -o a.out output_file
 $ ./a.out
 $ echo $?
 ```
-Then you see the return value now. (PS. we just invoke the gcc as an assembler driver, cause the output_file was already an assembly file).
 
-## test
+Gcc is currently used as the back-end of the compiler to produce the binary from the output assembly file.
+
+## Running Tests
+
 ```bash
 $ mkdir gen/
 $ ./test.sh
@@ -52,10 +66,11 @@ $ ./test.sh
 * Toolchain: gcc 7.3.0
 
 ## Usage Example
-Cause now it's just in bare-metal development stage, so now it only supports little features.
+Due to the Beta state the compiler only supports a few features.
 
-You can define your own function now, but main function can not take input arguments.
-So you can write something like this.
+At the moment, `main` can not take any input arguments, but functions can be defined and called.
+
+Here is one example that calculates the 10th [fibonacci number](https://en.wikipedia.org/wiki/Fibonacci_number) and demonstrates a few other basic math functions.
 
 ```c
 int fib(int a) {if (a == 0 || a == 1) {return a;} else {return fib(a - 1) + fib(a - 2);}}
@@ -524,5 +539,5 @@ main:
 ```
 
 ## Contact
-If you got interested in this project, or got troubles with it, feel free to contact me with 
-waharaxn@gmail.com, best with tag [Crust-dev].
+If you are interested in this project, or have troubles with it, feel free to contact me at 
+waharaxn@gmail.com, with a subject line containing [Crust-dev].
