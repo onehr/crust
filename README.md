@@ -1,78 +1,66 @@
 # CRUST
 [![Build Status](https://travis-ci.com/onehr/crust.svg?branch=master)](https://travis-ci.com/onehr/crust)
 
-A simple C compiler written in Rust-lang from scratch, with no extra lib (only std in Rust).
+
+A simple C compiler written in the Rust-lang.
 
 ## Project Goal
-Support C11 Standard, generate `X86-64` Assembly Code from C source code.
-(Make sure you are testing it in 64 bit linux systems, now do not support 32-bit linux and macos
-(which will be implemented soon, cause I also got a mbp)).
+Support C11 Standard and generate X86_64 Assembly Code from C source code.
 
-PS. Now this compiler was in his very very-early stage(started at Mar 30, 2019), 
-but I plan to grow it until it can compile some real-world applications, not just simple function and hello-world, 
-So I will keep on learning and keep on updating this project.
-I think writing a compiler from scratch can learn a lot and it's lot of fun to do this, I can almost work on it continuously for a whole day
-if I have time :).
-
-This is not the first time I wrote small compiler, but this is the first time I wrote Rust project,
-So now I will mainly focus on how to use Rust better and build the basic compiler structures.
-
-## Now Support
-**Cause now it's in development, so it only supports little features in C**.
-- local variables declaration and assignment, so you can write something like this.
-```c
-int main() {
-        int a = 10;
-        int b = 10;
-        int c = a + b;
-        return c;
-}
-```
-- Unary Operator: `!`(not), `~`(bitwise one's complement), `-`(negtive)
-- Binary Operator: `||`, `&&`, `<`, `>`, `>=`, `<=`, `==`, `+`, `-`, `/`, `*`
-- Now only support int data type (which is ).
-- Support `if` `else`, and `exp1 ? exp2 : exp3`
-e.g.
-```
-int a = 1 ? 0 : 1;
-```
-- Support local scope binding now.
-Variable value should be shadowed by the inner scope.
-- Support `for`, `while`, `do`, `break`, `continue` now.
-- Support function now. (must be defined before use).
-- Support global variables now. (must be declared  before use).
+This compiler is in a Beta state (started at Mar 30, 2019), using it to develop would be like using a stick to face a dragon.
+The plan is to developing it until it can compile real-world applications.
+At the moment the main focus is on how to use Rust and build the basic structures.
 
 ## TODOLIST
-I will add my TODOLIST from my emacs org file soon.
+I will add project todo-list soon for better organization.
 
-## Development Platform
-* Platform : Windows Linux Subsystem (Ubuntu on Windows) + rustc(1.33.0) + cargo(1.33.0) + Emacs
-* Toolchain: gcc 7.3.0
-I was using a Windows Subsystem to build the project and test it, it should also work at native Linux 64 bit system. But only in 64 bit system,
-cause the assembly file now generated follows x86-64 syntax (instrcutions end with `q` and registers start with `%r` can not compile in gcc -m32).
+## Currently Supports
+**Because of the Beta nature, crust supports few C features**.
+1. Local Variables, declaration and assignment.
+2. The `return` statement.
+3. Unary Operators: `!`, `~`, `-`(Negation).
+4. Binary Operators: `||`, `&&`, `<`, `>`, `>=`, `<=`, `==`, `+`, `-`, `/`, `*`.
+5. Ternary Operator: `exp1 ? exp2 : exp3`.
+5. `int` data type.
+6. `if` keyword.
+7. `else` keyword.
+8. `for` keyword.
+9. `while` keyword.
+10. `do` keyword.
+11. `break` keyword.
+12. `continue` keyword.
+14. Local scope binding.
+16. Function definition.
+17. Global variables.
+
+## Requirements
+
+You need a valid rust environment, Cargo, and gcc (7.3.0). Gcc is needed to translate the output assembly to binary code.
 
 ## Build
-First you need to setup your rust enviroment to build crust compiler, for this I recommend using `rustup` to install `rustc` and `cargo`.
-You should also have also gcc(my version is 7.3.0) as an assembler driver to trasnlate the assembly code to binary.
 
 ```bash
 $ cargo build # use this command to build the project
 ```
 You can run with
+
 ```bash
 $ cargo run source_file.c output_file.s # compile source_file.c => output_file.s
 ```
 
 You can get [output_file] as an assembly code file, which can be assembled into an ELF executable file.
 If you want to run the program, you should type:
+
 ```bash
 $ gcc -o a.out output_file.s
 $ ./a.out
 $ echo $?
 ```
-Then you see the return value now. (PS. we just invoke the gcc as an assembler driver, cause the output_file was already an assembly file).
 
-## test
+Gcc is currently used as the back-end of the compiler to produce the binary from the output assembly file.
+
+## Running Tests
+
 ```bash
 $ mkdir gen/
 $ ./test.sh
@@ -80,10 +68,11 @@ $ ./test.sh
 
 
 ## Usage Example
-Cause now it's just in bare-metal development stage, so now it only supports little features.
+Due to the Beta state the compiler only supports a few features.
 
-You can define your own function now, but main function can not take input arguments.
-So you can write something like this.
+At the moment, `main` can not take any input arguments, but functions can be defined and called.
+
+Here is one example that calculates the 10th [fibonacci number](https://en.wikipedia.org/wiki/Fibonacci_number) and demonstrates a few other basic math functions.
 
 ```c
 int fib(int a) {if (a == 0 || a == 1) {return a;} else {return fib(a - 1) + fib(a - 2);}}
@@ -552,5 +541,5 @@ main:
 ```
 
 ## Contact
-If you got interested in this project, or got troubles with it, feel free to contact me with 
-waharaxn@gmail.com, best with tag [Crust-dev].
+If you are interested in this project, or have troubles with it, feel free to contact me at 
+waharaxn@gmail.com, with a subject line containing [Crust-dev].
