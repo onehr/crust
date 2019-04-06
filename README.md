@@ -6,7 +6,7 @@ A simple C compiler written in the Rust-lang.
 ## Project Goal
 Support C11 Standard and generate X86_64 Assembly Code from C source code.
 
-This compiler is in a bare-metal state, using it to develop would be like using a stick to face a dragon.
+This compiler is in a Beta state, using it to develop would be like using a stick to face a dragon.
 The plan is to developing it until it can compile real-world applications.
 At the moment the main focus is on how to use Rust and build the basic structures.
 
