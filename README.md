@@ -1,14 +1,18 @@
 # CRUST
 [![Build Status](https://travis-ci.com/onehr/crust.svg?branch=master)](https://travis-ci.com/onehr/crust)
 
+
 A simple C compiler written in the Rust-lang.
 
 ## Project Goal
 Support C11 Standard and generate X86_64 Assembly Code from C source code.
 
-This compiler is in a Beta state, using it to develop would be like using a stick to face a dragon.
+This compiler is in a Beta state (started at Mar 30, 2019), using it to develop would be like using a stick to face a dragon.
 The plan is to developing it until it can compile real-world applications.
 At the moment the main focus is on how to use Rust and build the basic structures.
+
+## TODOLIST
+I will add project todo-list soon for better organization.
 
 ## Currently Supports
 **Because of the Beta nature, crust supports few C features**.
@@ -36,18 +40,19 @@ You need a valid rust environment, Cargo, and gcc (7.3.0). Gcc is needed to tran
 ## Build
 
 ```bash
-$ cargo build
+$ cargo build # use this command to build the project
 ```
 You can run with
 
 ```bash
-$ cargo run source_file output_file
+$ cargo run source_file.c output_file.s # compile source_file.c => output_file.s
 ```
+
 You can get [output_file] as an assembly code file, which can be assembled into an ELF executable file.
 If you want to run the program, you should type:
 
 ```bash
-$ gcc -o a.out output_file
+$ gcc -o a.out output_file.s
 $ ./a.out
 $ echo $?
 ```
@@ -61,9 +66,6 @@ $ mkdir gen/
 $ ./test.sh
 ```
 
-## Development Platform
-* Platform : Windows Linux Subsystem (Ubuntu on Windows) + rustc(1.33.0) + cargo(1.33.0) + Emacs
-* Toolchain: gcc 7.3.0
 
 ## Usage Example
 Due to the Beta state the compiler only supports a few features.
@@ -103,7 +105,7 @@ int main() {
         return EXIT_SUCCESS;
 }
 ```
-This is actually a unit test, it can test every function works correctly,
+This can actually be an unit test, it can test every function works correctly,
 if everything goes fine, this program should retrun `EXIT_SUCCESS`, if there's something wrong, it will return 1,
 which is `EXIT_FAILURE`.
 
