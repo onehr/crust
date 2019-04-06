@@ -968,29 +968,26 @@ pub fn parse_prog(input: &String, c_src_name: &String) -> Result<ParseNode, Stri
     let mut prog_node = ParseNode::new();
     prog_node.entry = NodeType::Prog(c_src_name.to_string());
     let mut pos = 0;
-    while let (fn_node, new_pos) = r#try!(p_fn(&toks, pos)) {
-        prog_node.child.push(fn_node);
-        pos = new_pos;
-        if (pos >= toks.len()) {
-            break;
+    // now we need to add support for global variables
+    while pos < toks.len() {
+        // try to parse global variable declaration
+        let p_res = p_declare(&toks, pos);
+        match p_res {
+            Ok((decl_node, new_pos)) => {
+                pos = new_pos;
+                prog_node.child.push(decl_node);
+            }
+            Err(_) => {
+                // try to parse fn definition
+                // println!("try to parse fn definition");
+                let (fn_node, new_pos) = r#try!(p_fn(&toks, pos));
+                prog_node.child.push(fn_node);
+                pos = new_pos;
+            }
         }
     }
-    //println!("len = {}", prog_node.child.len());
+
     return Ok(prog_node);
-    /*
-    p_fn(&toks, 0).and_then(|(n, i)| {
-        if i <= toks.len() {
-            let mut prog_node = ParseNode::new();
-            prog_node.entry = NodeType::Prog(c_src_name.to_string());
-            prog_node.child.push(n);
-            //Ok(prog_node)
-        } else {
-            Err(format!(
-                "Expected end of input, found {:?} at {}",
-                &toks[i], i
-            ))
-        }
-    })*/
 }
 
 pub fn print(tree: &ParseNode, idt: usize) -> String {

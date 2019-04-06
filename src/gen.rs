@@ -21,7 +21,8 @@ fn fn_main_has_ret() {
 fn gen_fn_prologue(fn_name: String) -> String {
     let p = "        ";
     format!(
-        "{}.global {}\n\
+        "{}.text\n\
+         {}.global {}\n\
          {}.type {}, @function\n\
          {}:\n\
          {}:\n\
@@ -32,6 +33,7 @@ fn gen_fn_prologue(fn_name: String) -> String {
          {}movq	%rsp, %rbp\n\
          {}.cfi_def_cfa_register 6\n\
          ",
+        p,
         p,
         fn_name,
         p,
@@ -56,15 +58,138 @@ fn gen_fn_epilogue() -> String {
         p, p, p
     )
 }
+
+fn compute_const(tree: &ParseNode) -> i64 {
+    match &tree.entry {
+        NodeType::BinExp(op) => {
+            let lhs = compute_const(tree.child.get(0).unwrap());
+            let rhs = compute_const(tree.child.get(1).unwrap());
+            match op {
+                TokType::Plus => {
+                    return lhs + rhs;
+                }
+                TokType::Multi => {
+                    return lhs * rhs;
+                }
+                TokType::Splash => {
+                    return lhs / rhs;
+                }
+                TokType::And => {
+                    if lhs != 0 && rhs != 0 {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                }
+                TokType::Or => {
+                    if lhs != 0 || rhs != 0 {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                }
+                TokType::Equal => {
+                    if lhs == rhs {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                }
+                TokType::NotEqual => {
+                    if lhs != rhs {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                }
+                TokType::LessEqual => {
+                    if lhs <= rhs {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                }
+                TokType::GreaterEqual => {
+                    if lhs >= rhs {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                }
+                TokType::Lt => {
+                    if lhs < rhs {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                }
+                TokType::Gt => {
+                    if lhs > rhs {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                }
+                _ => panic!("{:?} should not occur in global variable initialization"),
+            }
+        }
+        NodeType::UnExp(op) => {
+            let child_val = compute_const(tree.child.get(0).unwrap());
+            match op {
+                TokType::Minus => {
+                    return -child_val;
+                }
+                TokType::Tilde => {
+                    return !child_val;
+                }
+                TokType::Exclamation => {
+                    if child_val == 0 {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                }
+                _ => panic!("Expected Unary Operator, found {:?}", op),
+            }
+        }
+        NodeType::Const(val) => {
+            return val * 1;
+        }
+        _ => return compute_const(tree.child.get(0).unwrap()),
+    }
+}
 pub fn gen_prog(tree: &ParseNode) -> String {
     let p = "        ".to_string();
 
     // iter every function node
     let mut prog_body = String::new();
     let index_map: HashMap<String, isize> = HashMap::new();
+    let mut global_variable_scope: HashSet<String> = HashSet::new();
     let idx: isize = 0;
     for it in tree.child.iter() {
         match &it.entry {
+            NodeType::Declare(var_name) => {
+                // record it in the scope, index_map,
+                let mut val = 0;
+                if (it.child.is_empty()) {
+                    val = 0;
+                } else {
+                    val = compute_const(&it.child.get(0).unwrap());
+                }
+                global_variable_scope.insert(var_name.to_string());
+                let s = format!(
+                    "{}.globl	{}\n\
+                     {}.data\n\
+                     {}.align 8\n\
+                     {}.type	{}, @object\n\
+                     {}.size	{}, 8\n\
+                     {}:\n\
+                     {}.long	{}\n",
+                    p, var_name, p, p, p, var_name, p, var_name, var_name, p, val
+                );
+
+                prog_body.push_str(&s);
+            }
             NodeType::Fn(fn_name, var_list_opt) => {
                 let fn_prologue = gen_fn_prologue(fn_name.to_string());
                 let fn_epilogue = gen_fn_epilogue();
@@ -93,6 +218,7 @@ pub fn gen_prog(tree: &ParseNode) -> String {
                     None,
                     true,
                     CALL_BY_FUNCTION,
+                    &global_variable_scope,
                 );
                 let tmp = unsafe {
                     if FLAG_FOR_MAIN_HAS_RET == false {
@@ -131,6 +257,7 @@ pub fn gen_prog(tree: &ParseNode) -> String {
             _ => panic!("`{:?}` type should not be here", it.entry),
         }
     }
+
     match &tree.entry {
         NodeType::Prog(prog_name) => format!(
             "{}.file \"{}\"\n\
@@ -152,6 +279,7 @@ pub fn gen_declare(
     leb: &str,
     loop_in_label: Option<&str>,
     loop_out_label: Option<&str>,
+    global_variable_scope: &HashSet<String>,
 ) -> (HashMap<String, isize>, HashMap<String, bool>, isize, String) {
     // println!("in gen_declare with {:?}", tree.entry);
     let p = "        ";
@@ -187,19 +315,6 @@ pub fn gen_declare(
                     idx -= 8;
                 }
             }
-            // if scope.get(var_name) {
-            //     panic!(
-            //         "Error: redeclaration of variable `{}` in the same scope",
-            //         var_name
-            //     );
-            // } else {
-            //     let tmp_str = format!("{}", var_name);
-            //     scope.insert(tmp_str);
-            //     // try to clear the previous index
-            //     let tmp_str = format!("{}", var_name);
-            //     index_map.insert(tmp_str, idx - 8);
-            //     idx -= 8;
-            // }
 
             // judge whether it's initialized
             let mut e1 = String::new();
@@ -218,6 +333,7 @@ pub fn gen_declare(
                     leb,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 );
             }
             let s = format!(
@@ -231,7 +347,12 @@ pub fn gen_declare(
     }
 }
 
-pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize) -> String {
+pub fn gen_for(
+    tree: &ParseNode,
+    index_map: &HashMap<String, isize>,
+    idx: isize,
+    global_variable_scope: &HashSet<String>,
+) -> String {
     let p = "        ".to_string();
     let label_begin_loop = gen_labels("BFOR".to_string());
     let label_end_loop = gen_labels("EFOR".to_string());
@@ -251,6 +372,7 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
                 &label_end_loop,
                 Some(&label_begin_loop),
                 Some(&label_end_loop),
+                &global_variable_scope,
             );
             index_map = index_map_new.clone();
             idx = idx_new;
@@ -263,6 +385,7 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
                 &label_end_loop,
                 Some(&label_begin_loop),
                 Some(&label_end_loop),
+                &global_variable_scope,
             );
             let post_exp = gen_stmt(
                 tree.child.get(2).unwrap(),
@@ -272,6 +395,7 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
                 &label_end_loop,
                 Some(&label_begin_loop),
                 Some(&label_end_loop),
+                &global_variable_scope,
             );
             let stmt = gen_block(
                 tree.child.get(3).unwrap(),
@@ -282,6 +406,7 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
                 Some(&label_end_loop),
                 true,
                 false,
+                &global_variable_scope,
             );
             //           generate init (declare)
             // BEGN_LOOP:
@@ -334,6 +459,7 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
                 &label_end_loop,
                 Some(&label_begin_loop),
                 Some(&label_end_loop),
+                &global_variable_scope,
             );
             let condition = gen_stmt(
                 tree.child.get(1).unwrap(),
@@ -343,6 +469,7 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
                 &label_end_loop,
                 Some(&label_begin_loop),
                 Some(&label_end_loop),
+                &global_variable_scope,
             );
             let post_exp = gen_stmt(
                 tree.child.get(2).unwrap(),
@@ -352,6 +479,7 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
                 &label_end_loop,
                 Some(&label_begin_loop),
                 Some(&label_end_loop),
+                &global_variable_scope,
             );
             let stmt = gen_block(
                 tree.child.get(3).unwrap(),
@@ -362,6 +490,7 @@ pub fn gen_for(tree: &ParseNode, index_map: &HashMap<String, isize>, idx: isize)
                 Some(&label_end_loop),
                 true,
                 false,
+                &global_variable_scope,
             );
             //           generate init
             // BEGN_LOOP:
@@ -418,6 +547,7 @@ pub fn gen_block(
     loop_out_label: Option<&str>,
     flag: bool,
     call_by_fn: bool,
+    global_variable_scope: &HashSet<String>,
 ) -> String {
     let p = "        ".to_string(); // 8 white spaces
     let label_begin_block = gen_labels("BB".to_string());
@@ -445,6 +575,7 @@ pub fn gen_block(
                     &label_end_block,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 );
                 index_map = index_map_new.clone();
                 idx = idx_new;
@@ -461,6 +592,7 @@ pub fn gen_block(
                     loop_out_label,
                     true,
                     false, // call by  function not true
+                    &global_variable_scope,
                 ));
             }
             _ => {
@@ -472,6 +604,7 @@ pub fn gen_block(
                     &label_end_block,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 );
                 stmts.push_str(&s);
             }
@@ -507,6 +640,7 @@ pub fn gen_stmt(
     leb: &str, // label_end_block
     loop_in_label: Option<&str>,
     loop_out_label: Option<&str>,
+    global_variable_scope: &HashSet<String>,
 ) -> String {
     let p = "        ".to_string(); // 8 white spaces
     match &tree.entry {
@@ -523,6 +657,7 @@ pub fn gen_stmt(
                     leb,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 )
             } else if tree.child.len() == 3 {
                 // <logical-or-exp> "?" <exp> ":" <conditional-exp>
@@ -534,6 +669,7 @@ pub fn gen_stmt(
                     leb,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 );
                 let e2_as = gen_stmt(
                     tree.child.get(1).expect("conditional expression no e2"),
@@ -543,6 +679,7 @@ pub fn gen_stmt(
                     leb,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 );
                 let e3_as = gen_stmt(
                     tree.child.get(2).expect("conditional expression no e3"),
@@ -552,6 +689,7 @@ pub fn gen_stmt(
                     leb,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 );
 
                 let label_e3 = gen_labels(format!("E3"));
@@ -585,6 +723,7 @@ pub fn gen_stmt(
                     leb,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 ));
                 // pushq
                 s.push_str(&format!("{}pushq %rax\n", p));
@@ -612,6 +751,7 @@ pub fn gen_stmt(
                     leb,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 ),
                 gen_fn_epilogue(),
                 p
@@ -625,6 +765,7 @@ pub fn gen_stmt(
                     leb,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 );
                 let s1_as = gen_stmt(
                     tree.child.get(1).expect("conditional node no s1"),
@@ -634,6 +775,7 @@ pub fn gen_stmt(
                     leb,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 );
                 let s2_as: String = if tree.child.len() == 2 {
                     "".to_string()
@@ -646,6 +788,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     )
                 };
                 let label_s2 = gen_labels(format!("S2"));
@@ -670,6 +813,7 @@ pub fn gen_stmt(
                 leb,
                 loop_in_label,
                 loop_out_label,
+                &global_variable_scope,
             ),
             StmtType::Continue => match loop_in_label {
                 Some(l) => format!("{}jmp {} # Continue\n", p, l),
@@ -679,7 +823,9 @@ pub fn gen_stmt(
                 Some(l) => format!("{}jmp {} # Break\n", p, l),
                 None => panic!("Break shoule be in the loop scope"),
             },
-            StmtType::For | StmtType::ForDecl => gen_for(tree, index_map, idx),
+            StmtType::For | StmtType::ForDecl => {
+                gen_for(tree, index_map, idx, &global_variable_scope)
+            }
             StmtType::Do => {
                 // LBB.
                 // stmt
@@ -699,6 +845,7 @@ pub fn gen_stmt(
                     loop_out_label,
                     true,
                     false,
+                    &global_variable_scope,
                 ); // should enter a new scope
                 let exp = gen_stmt(
                     tree.child.get(1).unwrap(),
@@ -708,6 +855,7 @@ pub fn gen_stmt(
                     &leb,
                     Some(&lbb),
                     Some(&leb),
+                    &global_variable_scope,
                 );
                 format!(
                     "{}:\n\
@@ -738,6 +886,7 @@ pub fn gen_stmt(
                     &leb,
                     Some(&lbb),
                     Some(&leb),
+                    &global_variable_scope,
                 );
                 let stmts = gen_block(
                     tree.child.get(1).unwrap(),
@@ -748,6 +897,7 @@ pub fn gen_stmt(
                     Some(&leb),
                     true,
                     false,
+                    &global_variable_scope,
                 ); // should enter a new scope
                 format!(
                     "{}:\n\
@@ -771,11 +921,41 @@ pub fn gen_stmt(
                     loop_out_label,
                     true,
                     false,
+                    &global_variable_scope,
                 )
             }
         },
         NodeType::AssignNode(var_name) => {
             match index_map.get(var_name) {
+                None => {
+                    // not in current scope, try to search global scope
+                    match global_variable_scope.contains(var_name) {
+                        true => {
+                            // declared in global scope, that's ok
+                            let e1 = gen_stmt(
+                                tree.child
+                                    .get(0)
+                                    .expect("Statement::Declare Node has no child"),
+                                index_map,
+                                idx,
+                                lbb,
+                                leb,
+                                loop_in_label,
+                                loop_out_label,
+                                &global_variable_scope,
+                            );
+                            format!(
+                                "{}\
+                                 {}movq %rax, {}(%rip)\n",
+                                e1, p, var_name
+                            )
+                        }
+                        false => {
+                            // Not declared before, that's not ok
+                            panic!("Error: Use un-declared variable `{}`", var_name)
+                        }
+                    }
+                }
                 Some(t) => {
                     // declared before, that's ok
                     let e1 = gen_stmt(
@@ -788,6 +968,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     );
                     let get_result = index_map.get(var_name);
                     let mut va_offset: isize = -8;
@@ -803,10 +984,6 @@ pub fn gen_stmt(
                         e1, p, va_offset
                     )
                 }
-                None => {
-                    // Not declared before, that's not ok
-                    panic!("Error: Use un-declared variable `{}`", var_name)
-                }
             }
         }
         NodeType::UnExp(Op) => match Op {
@@ -821,6 +998,7 @@ pub fn gen_stmt(
                     leb,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 ),
                 p
             ),
@@ -835,6 +1013,7 @@ pub fn gen_stmt(
                     leb,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 ),
                 p
             ),
@@ -851,6 +1030,7 @@ pub fn gen_stmt(
                     leb,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 ),
                 p,
                 p,
@@ -879,6 +1059,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     gen_stmt(
@@ -889,6 +1070,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     p
@@ -908,6 +1090,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     gen_stmt(
@@ -918,6 +1101,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     p
@@ -936,6 +1120,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     gen_stmt(
@@ -946,6 +1131,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     p
@@ -966,6 +1152,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     gen_stmt(
@@ -976,6 +1163,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     p,
@@ -997,6 +1185,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     gen_stmt(
@@ -1007,6 +1196,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     p,
@@ -1029,6 +1219,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     gen_stmt(
@@ -1039,6 +1230,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     p,
@@ -1061,6 +1253,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     gen_stmt(
@@ -1071,6 +1264,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     p,
@@ -1093,6 +1287,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     gen_stmt(
@@ -1103,6 +1298,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     p,
@@ -1132,6 +1328,7 @@ pub fn gen_stmt(
                             leb,
                             loop_in_label,
                             loop_out_label,
+                            &global_variable_scope,
                         ),
                         p,
                         p,
@@ -1148,6 +1345,7 @@ pub fn gen_stmt(
                             leb,
                             loop_in_label,
                             loop_out_label,
+                            &global_variable_scope,
                         ),
                         p,
                         p,
@@ -1177,6 +1375,7 @@ pub fn gen_stmt(
                             leb,
                             loop_in_label,
                             loop_out_label,
+                            &global_variable_scope,
                         ),
                         p,
                         p,
@@ -1192,6 +1391,7 @@ pub fn gen_stmt(
                             leb,
                             loop_in_label,
                             loop_out_label,
+                            &global_variable_scope,
                         ),
                         p,
                         p,
@@ -1215,6 +1415,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     gen_stmt(
@@ -1225,6 +1426,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     p,
@@ -1247,6 +1449,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     gen_stmt(
@@ -1257,6 +1460,7 @@ pub fn gen_stmt(
                         leb,
                         loop_in_label,
                         loop_out_label,
+                        &global_variable_scope,
                     ),
                     p,
                     p,
@@ -1277,7 +1481,17 @@ pub fn gen_stmt(
                     let var_offset = t;
                     format!("{}movq {}(%rbp), %rax\n", p, var_offset)
                 }
-                None => panic!(format!("Use of undeclared variable `{}`", var_name)),
+                None => {
+                    // try to search global scope
+                    match global_variable_scope.contains(var_name) {
+                        true => {
+                            // in global scope
+                            let var_offset = var_name;
+                            format!("{}movq {}(%rip), %rax\n", p, var_offset)
+                        }
+                        false => panic!(format!("Use of undeclared variable `{}`", var_name)),
+                    }
+                }
             }
         }
         NodeType::ExpOption => {
@@ -1292,6 +1506,7 @@ pub fn gen_stmt(
                     leb,
                     loop_in_label,
                     loop_out_label,
+                    &global_variable_scope,
                 )
             } else {
                 // null exp
@@ -1317,6 +1532,7 @@ pub fn gen_stmt(
             leb,
             loop_in_label,
             loop_out_label,
+            &global_variable_scope,
         ),
         _ => panic!(format!(
             "Node `{:?}` not implemented in gen::gen_stmt()\n",

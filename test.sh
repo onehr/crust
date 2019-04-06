@@ -462,4 +462,24 @@ src=$srcdir/variable_as_arg.c
 dst=$dstdir/variable_as_arg.s
 test_fun $src $dst
 
+src=$srcdir/fun_shadowed_by_variable.c
+dst=$dstdir/fun_shadowed_by_variable.s
+test_fun $src $dst
+src=$srcdir/global.c
+dst=$dstdir/global.s
+test_fun $src $dst
+src=$srcdir/global_not_initialized.c
+dst=$dstdir/global_not_initialized.s
+test_fun $src $dst
+src=$srcdir/global_shadowed.c
+dst=$dstdir/global_shadowed.s
+test_fun $src $dst
+src=$srcdir/multiple_global.c
+dst=$dstdir/multiple_global.s
+test_fun $src $dst
+
+src=$srcdir/combine_2.c
+dst=$dstdir/combine_2.s
+test_fun $src $dst
+
 echo -e "Passed all [$inc] tests :)"
