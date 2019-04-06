@@ -170,25 +170,26 @@ pub fn gen_prog(tree: &ParseNode) -> String {
         match &it.entry {
             NodeType::Declare(var_name) => {
                 // record it in the scope, index_map,
-                let mut val = 0;
-                if (it.child.is_empty()) {
-                    val = 0;
-                } else {
-                    val = compute_const(&it.child.get(0).unwrap());
-                }
                 global_variable_scope.insert(var_name.to_string());
-                let s = format!(
-                    "{}.globl	{}\n\
-                     {}.data\n\
-                     {}.align 8\n\
-                     {}.type	{}, @object\n\
-                     {}.size	{}, 8\n\
-                     {}:\n\
-                     {}.long	{}\n",
-                    p, var_name, p, p, p, var_name, p, var_name, var_name, p, val
-                );
-
-                prog_body.push_str(&s);
+                if (it.child.is_empty()) {
+                    // uninitialized global variable
+                    // just put them in .comm
+                    // now we use value has 8 bytes by default.
+                    // XXX: should be vary-length based on the data type.
+                    prog_body.push_str(&format!("{}.comm {}, 8, 8\n", p, var_name, ))
+                } else {
+                    let val = compute_const(&it.child.get(0).unwrap());
+                    prog_body.push_str(&format!(
+                        "{}.globl	{}\n\
+                         {}.data\n\
+                         {}.align 8\n\
+                         {}.type	{}, @object\n\
+                         {}.size	{}, 8\n\
+                         {}:\n\
+                         {}.long	{}\n",
+                        p, var_name, p, p, p, var_name, p, var_name, var_name, p, val
+                    ));
+                }
             }
             NodeType::Fn(fn_name, var_list_opt) => {
                 let fn_prologue = gen_fn_prologue(fn_name.to_string());
