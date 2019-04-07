@@ -1,16 +1,5 @@
-int main() {
-	putchar('H');
-	putchar('e');
-	putchar('l');
-	putchar('l');
-	putchar('o');
-	putchar(',');
-	putchar(' ');
-	putchar('C');
-	putchar('R');
-	putchar('U');
-	putchar('S');
-	putchar('T');
-	putchar('!');
-	putchar('\n');
+int main(void) {
+	printf("Hello, CRUST!\n");
+	printf("This is a simple sample code that can be compiled by crust.\n");	
+	return 0;
 }
