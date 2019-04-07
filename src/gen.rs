@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::lexer::TokType;
 use crate::parser::{NodeType, ParseNode, StmtType, DataType};
 use std::collections::{HashMap, HashSet};
@@ -200,29 +201,24 @@ pub fn gen_prog(tree: &ParseNode) -> String {
                 let fn_epilogue = gen_fn_epilogue();
                 // cause in function, we have to pass the offset of argument and scope contains argument
                 // to function body
-                let CALL_BY_FUNCTION = true;
-                let mut param_offset = 16; // EBP + 16 (old EBP at 0, return address at 8)
+                let call_by_function = true;
                 let mut index_map: HashMap<String, isize> = HashMap::new();
                 let mut scope: HashMap<String, bool> = HashMap::new();
                 match var_list_opt {
                     Some(var_list) => {
+                        let mut param_offset = 16 + (var_list.len() as isize - 6 - 1) * 8; // EBP + 16 (old EBP at 0, return address at 8)
                         for i in 0..var_list.len() {
                             scope.insert(var_list[i].to_string(), true);
                             if i >= 6 {
                                 // this is stored in stack, starting from EBP + 16
                                 index_map.insert(var_list[i].to_string(), param_offset);
-                                param_offset += 8;
+                                param_offset -= 8;
                             } else {
                                 // stored in regs, we use offset from 0-5 as index to regs.
                                 // and use (i+1)*-8 as their index, cause we will push them one by one at the new frame stack
                                 index_map.insert(var_list[i].to_string(), - (i as isize +1) * 8);
                             }
                         }
-                    //     for var in var_list {
-                    //         index_map.insert(var.to_string(), param_offset);
-                    //         scope.insert(var.to_string(), true);
-                    //         param_offset += 8;
-                    //     }
                     }
                     None => {}
                 }
@@ -234,7 +230,7 @@ pub fn gen_prog(tree: &ParseNode) -> String {
                     None,
                     None,
                     true,
-                    CALL_BY_FUNCTION,
+                    call_by_function,
                     &global_variable_scope,
                 );
                 let tmp = unsafe {
@@ -579,10 +575,16 @@ pub fn gen_block(
     } else {
         // this is a function definition block
         // we need to store the input argument in the stack
-        let regs : Vec<&'static str> = vec!["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
         // first push them in stack
-        for i in 0..scope.len() {
-            stmts.push_str(&format!("{}pushq {}\n", p, regs[i]));
+        let regs : Vec<&'static str> = vec!["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
+        if (current_scope.len() > 6) {
+            for i in 0..6 {
+                stmts.push_str(&format!("{}pushq {}\n", p, regs[i]));
+            }
+        } else {
+            for i in 0..current_scope.len() {
+                stmts.push_str(&format!("{}pushq {}\n", p, regs[i]));
+            }
         }
         // XXX: cause right now the generated will use small amout of registers,
         // but in the future will need to save callee-saved registers in the function stack
@@ -758,7 +760,7 @@ pub fn gen_stmt(
                     loop_out_label,
                     &global_variable_scope,
                 ));
-                if (i >= 5) {
+                if (i >= 6) {
                     // store in stack
                     s.push_str(&format!("{}pushq %rax\n", p));
                 } else {
@@ -1161,7 +1163,7 @@ pub fn gen_stmt(
                 }
             }
         }
-        NodeType::UnExp(Op) => match Op {
+        NodeType::UnExp(op) => match op {
             TokType::Minus => format!(
                 "{}\
                  {}neg %rax\n",
@@ -1215,11 +1217,11 @@ pub fn gen_stmt(
             TokType::Gt => format!("Error: `>` not implemented"),
             _ => panic!(format!(
                 "Unary Operator `{:?}` not implemented in gen::gen_unexp()\n",
-                Op
+                op
             )),
         },
-        NodeType::BinExp(Op) => {
-            match Op {
+        NodeType::BinExp(op) => {
+            match op {
                 TokType::Plus => format!(
                     "{}\
                      {}pushq %rax\n\
@@ -1644,7 +1646,7 @@ pub fn gen_stmt(
                 ),
                 _ => panic!(format!(
                     "Error: Binary Operator `{:?}` not implemented in gen::gen_binexp()\n",
-                    Op
+                    op
                 )),
             }
         }
