@@ -948,13 +948,20 @@ pub fn gen_stmt(
             // movq (%rbx, rdx, data size), %rax
             format!(
                 "{}\
+                 {}pushq %rdx\n\
+                 {}pushq %rbx\n\
                  {}movq %rax, %rdx\n\
                  {}movq {}@GOTPCREL(%rip), %rbx\n\
-                 {}movq (%rbx, %rdx, 8), %rax\n",
+                 {}movq (%rbx, %rdx, 8), %rax\n\
+                 {}popq %rbx\n\
+                 {}popq %rdx\n",
                 get_index,
+                p,
+                p,
                 p,
                 p, var_name,
                 p,
+                p,p,
             )
         },
         NodeType::AssignNode(var_name, true) => {
