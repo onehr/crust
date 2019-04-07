@@ -153,7 +153,7 @@ if there's something wrong, it will return 1,
 which is `EXIT_FAILURE`.
 
 If we use the `crust` compiler to compile this program and run the final executable file,
-the program will return 0, which is correct.
+the program will return 99, which is correct.
 
 The generated code would be some thing like this (The assmebly file contains too many lines, so I just paste a snippet of it)
 
