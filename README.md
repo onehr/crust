@@ -76,7 +76,30 @@ Due to the Beta state the compiler only supports a few features.
 
 At the moment, `main` can not take any input arguments, but functions can be defined and called.
 
-Here is one example from file `test/valid/combine_4.c`.
+As the tradition in programmer community, we should print the "hello world" first,
+cause crust now only support int type, so you can do it this way.
+```c
+int main() {
+        putchar(72);
+        putchar(101);
+        putchar(108);
+        putchar(108);
+        putchar(111);
+        putchar(44);
+        putchar(32);
+        putchar(67);
+        putchar(82);
+        putchar(85);
+        putchar(83);
+        putchar(84);
+        putchar(33);
+        putchar(10);
+        return 0;
+}
+```
+This program will prints `Hello, CRUST!` in your terminal.
+
+And here is one more complex example from file `test/valid/combine_4.c`.
 It defines a `fib` function and use it to calculate the 
 10th [fibonacci number](https://en.wikipedia.org/wiki/Fibonacci_number),
 then generate a fibonacci array,
