@@ -774,7 +774,7 @@ pub fn gen_stmt(
                     s.push_str(&format!("{}pushq %rax\n", p));
                 } else {
                     // store into regs.
-                    s.push_str(&format!("{}movq %rax, {}\n", p, regs[i]));
+                    s.push_str(&format!("{}movq %rax, {}\n{}movq $0, %rax\n", p, regs[i], p));
                 }
             }
             // for it in tree.child.iter().rev() {
