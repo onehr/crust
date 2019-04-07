@@ -42,8 +42,16 @@ pub enum TokType {
     Colon,              // :
     QuestionMark,       // ?
     Comma,              // ,
+    String(String, String),
 }
 
+static mut LABEL_COUNTER: i64 = -1;
+fn gen_string_tag() -> String {
+    unsafe {
+        LABEL_COUNTER = LABEL_COUNTER + 1;
+        return format!(".LSTR{}", LABEL_COUNTER);
+    }
+}
 pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
     let mut result = Vec::new();
 
@@ -51,6 +59,17 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
 
     while let Some(&c) = it.peek() {
         match c {
+            '"' => {
+                it.next();
+                let mut s = "".to_string();
+                while let &c = it.peek().unwrap() {
+                    if (c == '"') {break;}
+                    s.push(c);
+                    it.next();
+                }
+                result.push(TokType::String(s, gen_string_tag()));
+                it.next();
+            }
             '\'' => {
                 // try parse a char
                 // now just use int to represent char

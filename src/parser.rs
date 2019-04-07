@@ -19,6 +19,7 @@ pub enum NodeType {
     //               | "continue" ";"
     Block, // <block> ::= <statement> | <declaration>
     Const(i64),
+    StringLiteral(String, String), // data, tag
     Var(String),
     ArrayRef(String),  // referencing to array
     AssignNode(String, bool),     // String -> variable name, bool -> true if this is a assign to array element
@@ -33,7 +34,7 @@ pub enum NodeType {
     RelationalExp, // <relational-exp> ::= <additive-exp> { ("<" | ">" | "<=" | ">=") <additive-exp> }
     AdditiveExp,   // <additive-exp> ::= <term> { ("+" | "-") <term> }
     Term,          // <term> ::= <factor> { ("*" | "/") <factor> }
-    Factor,        // <factor> ::= <function-call> | "(" <exp> ")" | <unary_op> <factor> | <int> | <id> "[" <exp> "]" | <id>
+    Factor,        // <factor> ::= <function-call> | "(" <exp> ")" | <unary_op> <factor> | <int> | string | <id> "[" <exp> "]" | <id>
     FnCall(String),            // <function-call> ::= id "(" [ <exp> { "," <exp> } ] ")"
     Declare(String, DataType), // <declaration> ::= "int" <id> "[" <int> "]" ";" | "int" <id> [ = <exp> ] ";"
 }
@@ -770,6 +771,15 @@ fn p_factor(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize)
             // println!("out p_factor with pos: {}", pos);
             return Ok((factor_node, pos));
         }
+        lexer::TokType::String(chars, tag) => {
+            let mut string_node = ParseNode::new();
+            let mut factor_node = ParseNode::new();
+            string_node.entry = NodeType::StringLiteral(chars.to_string(), tag.to_string());
+            factor_node.entry = NodeType::Factor;
+            factor_node.child.push(string_node);
+
+            return Ok((factor_node, pos));
+        }
         lexer::TokType::Literal(n) => {
             // Factor -> Const
             let mut const_node = ParseNode::new();
@@ -1146,6 +1156,10 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
         idt_prefix = idt_prefix + "    ";
     }
     match &tree.entry {
+        NodeType::StringLiteral(data, tag) => format!(
+            "{}n_type: StringLiteral, tag: {}, data: [{}]",
+            idt_prefix, tag, data, 
+        ),
         NodeType::ArrayRef(var_name) => format!(
             "{}n_type: ArrayRef, var_name : {}, [\n{}\n{}]",
             idt_prefix, var_name,

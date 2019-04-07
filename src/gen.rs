@@ -550,7 +550,7 @@ pub fn gen_for(
         _ => panic!("Something wrong in gen_for"),
     }
 }
-/// gen_block() - into a new block, will have empty scope
+// gen_block() - into a new block, will have empty scope
 pub fn gen_block(
     tree: &ParseNode,
     index_map: &HashMap<String, isize>,
@@ -667,6 +667,15 @@ pub fn gen_stmt(
 ) -> String {
     let p = "        ".to_string(); // 8 white spaces
     match &tree.entry {
+        NodeType::StringLiteral(data, tag) => {
+            format!(
+                "{}.section .rodata\n\
+                 {}:\n\
+                 {}.string \"{}\"\n\
+                 {}.text\n\
+                 {}leaq {}(%rip), %rax\n",p, tag,p, data, p, p, tag,
+            )
+        },
         NodeType::ConditionalExp => {
             if tree.child.len() == 1 {
                 // just one <logical-or-exp>
