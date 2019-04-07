@@ -19,6 +19,8 @@ pub enum TokType {
     RBrace,             // }
     LParen,             // (
     RParen,             // )
+    LBracket,           // [
+    RBracket,           // ]
     Semicolon,          // ;
     Assign,             // =
     Lt,                 // <
@@ -105,6 +107,14 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
             }
             '}' => {
                 result.push(TokType::RBrace);
+                it.next();
+            }
+            '[' => {
+                result.push(TokType::LBracket);
+                it.next();
+            }
+            ']' => {
+                result.push(TokType::RBracket);
                 it.next();
             }
             ';' => {

@@ -1,5 +1,5 @@
 use crate::lexer::TokType;
-use crate::parser::{NodeType, ParseNode, StmtType};
+use crate::parser::{NodeType, ParseNode, StmtType, DataType};
 use std::collections::{HashMap, HashSet};
 
 // generate a std::String contains the assembly language code
@@ -168,7 +168,7 @@ pub fn gen_prog(tree: &ParseNode) -> String {
     let idx: isize = 0;
     for it in tree.child.iter() {
         match &it.entry {
-            NodeType::Declare(var_name) => {
+            NodeType::Declare(var_name, DataType::I64) => {
                 // record it in the scope, index_map,
                 global_variable_scope.insert(var_name.to_string());
                 if (it.child.is_empty()) {
@@ -190,6 +190,10 @@ pub fn gen_prog(tree: &ParseNode) -> String {
                         p, var_name, p, p, p, var_name, p, var_name, var_name, p, val
                     ));
                 }
+            }
+            NodeType::Declare(var_name, DataType::Arr64(len)) => {
+                global_variable_scope.insert(var_name.to_string());
+                prog_body.push_str(&format!("{}.comm {}, {}, 32\n", p, var_name, len * 8));
             }
             NodeType::Fn(fn_name, var_list_opt) => {
                 let fn_prologue = gen_fn_prologue(fn_name.to_string());
@@ -288,7 +292,7 @@ pub fn gen_declare(
     let mut scope = scope.clone();
     let mut idx = idx;
     match &tree.entry {
-        NodeType::Declare(var_name) => {
+        NodeType::Declare(var_name, data_type) => {
             let get_opt = scope.get(var_name);
             match get_opt {
                 Some(flag) => {
@@ -566,7 +570,7 @@ pub fn gen_block(
     for it in &tree.child {
         // iter through every block-item
         match &it.entry {
-            NodeType::Declare(_var_name) => {
+            NodeType::Declare(_var_name, DataType::I64) => {
                 let (index_map_new, scope_new, idx_new, s) = gen_declare(
                     it,
                     &index_map,
@@ -926,7 +930,117 @@ pub fn gen_stmt(
                 )
             }
         },
-        NodeType::AssignNode(var_name) => {
+        NodeType::ArrayRef(var_name) => {
+            let get_index = gen_stmt(
+                tree.child
+                    .get(0)
+                    .expect("Statement::Declare Node has no child"),
+                index_map,
+                idx,
+                lbb,
+                leb,
+                loop_in_label,
+                loop_out_label,
+                &global_variable_scope,
+            );
+            // get index => rdx,
+            // movq array_index var@GOTPCREL(%rip) => %rbx
+            // movq (%rbx, rdx, data size), %rax
+            format!(
+                "{}\
+                 {}movq %rax, %rdx\n\
+                 {}movq {}@GOTPCREL(%rip), %rbx\n\
+                 {}movq (%rbx, %rdx, 8), %rax\n",
+                get_index,
+                p,
+                p, var_name,
+                p,
+            )
+        },
+        NodeType::AssignNode(var_name, true) => {
+            match index_map.get(var_name) {
+                None => {
+                    // not in current scope, try to search global scope
+                    match global_variable_scope.contains(var_name) {
+                        true => {
+                            // declared in global scope, that's ok
+                            let get_index = gen_stmt(
+                                tree.child
+                                    .get(0)
+                                    .expect("Statement::Declare Node has no child"),
+                                index_map,
+                                idx,
+                                lbb,
+                                leb,
+                                loop_in_label,
+                                loop_out_label,
+                                &global_variable_scope,
+                            );
+                            let get_res = gen_stmt(
+                                tree.child.get(1).unwrap(),
+                                index_map,
+                                idx,
+                                lbb,
+                                leb,
+                                loop_in_label,
+                                loop_out_label,
+                                &global_variable_scope,
+                            );
+                            // movq array_index var@GOTPCREL(%rip) => %rbx
+                            // get index => rdx,
+                            // get res => rax
+                            // movq %rax, (%rbx, rdx, data size)
+                            format!(
+                                "{}\
+                                 {}movq %rax, %rdx\n\
+                                 {}\
+                                 {}movq {}@GOTPCREL(%rip), %rbx\n\
+                                 {}movq %rax, (%rbx, %rdx, 8)\n",
+                                get_index,
+                                p,
+                                get_res,
+                                p, var_name,
+                                p,
+                            )
+                        }
+                        false => {
+                            // Not declared before, that's not ok
+                            panic!("Error: Use un-declared variable `{}`", var_name)
+                        }
+                    }
+                }
+                Some(t) => {
+                    // declared before, that's ok
+                    let e1 = gen_stmt(
+                        tree.child
+                            .get(0)
+                            .expect("Statement::Declare Node has no child"),
+                        index_map,
+                        idx,
+                        lbb,
+                        leb,
+                        loop_in_label,
+                        loop_out_label,
+                        &global_variable_scope,
+                    );
+                    let get_result = index_map.get(var_name);
+                    let mut va_offset: isize = -8;
+                    match get_result {
+                        Some(t) => {
+                            va_offset = *t;
+                        }
+                        None => panic!("Something went wrong in gen::gen_stmt()"),
+                    }
+                    format!(
+                        "{}\
+                         {}movq %rax, {}(%rbp)\n",
+                        e1, p, va_offset
+                    )
+                }
+            }
+        }
+        NodeType::AssignNode(var_name, false) => {
+            // assign to int variable
             match index_map.get(var_name) {
                 None => {
                     // not in current scope, try to search global scope

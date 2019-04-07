@@ -20,10 +20,11 @@ pub enum NodeType {
     Block, // <block> ::= <statement> | <declaration>
     Const(i64),
     Var(String),
-    AssignNode(String),     // String -> variable name
+    ArrayRef(String),  // referencing to array
+    AssignNode(String, bool),     // String -> variable name, bool -> true if this is a assign to array element
     UnExp(lexer::TokType),  // Unary Expression
     BinExp(lexer::TokType), // Binary Operator
-    Exp,                    // <exp> ::= <id> "=" <exp> | <conditional-exp>
+    Exp,                    // <exp> ::= <id> ["[" <exp> "]"] "=" <exp> | <conditional-exp>
     ExpOption,              // <exp-option> :: <exp> | ""
     ConditionalExp, // <conditional-exp> ::= <logical-or-exp> [ "?" <exp> ":" <conditional-exp> ]
     LogicalOrExp,   // <logical-or-exp> ::= <logical-and-exp> { "||" <logical-and-exp> }
@@ -32,9 +33,15 @@ pub enum NodeType {
     RelationalExp, // <relational-exp> ::= <additive-exp> { ("<" | ">" | "<=" | ">=") <additive-exp> }
     AdditiveExp,   // <additive-exp> ::= <term> { ("+" | "-") <term> }
     Term,          // <term> ::= <factor> { ("*" | "/") <factor> }
-    Factor, // <factor> ::= <function-call> | "(" <exp> ")" | <unary_op> <factor> | <int> | <id>
-    FnCall(String), // <function-call> ::= id "(" [ <exp> { "," <exp> } ] ")"
-    Declare(String), // <declaration> ::= "int" <id> [= <exp> ] ";"
+    Factor,        // <factor> ::= <function-call> | "(" <exp> ")" | <unary_op> <factor> | <int> | <id> "[" <exp> "]" | <id>
+    FnCall(String),            // <function-call> ::= id "(" [ <exp> { "," <exp> } ] ")"
+    Declare(String, DataType), // <declaration> ::= "int" <id> "[" <int> "]" ";" | "int" <id> [ = <exp> ] ";"
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum DataType {
+    I64,          // now int in c was translated in 64 bits int
+    Arr64(i64), // int array[len]
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -154,9 +161,10 @@ fn p_exp_opt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize
         }
     }
 }
+
 fn p_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
     // println!("in fn: p_exp, with pos:{}", pos);
-    // <exp> ::= <id> "=" <exp> | <conditional-exp>
+    // <exp> ::= <id> [ "[" <exp> "]" ] "=" <exp> | <conditional-exp>
     let mut exp_node = ParseNode::new();
     exp_node.entry = NodeType::Exp;
 
@@ -166,19 +174,53 @@ fn p_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), S
             // check next token is Assign
             let mut pos = pos + 1;
             let tok = &toks[pos];
-            if tok != &lexer::TokType::Assign {
-                pos = pos - 1;
-                let (conditional_node, pos) = r#try!(p_conditional_exp(toks, pos));
-                exp_node.child.push(conditional_node);
-                return Ok((exp_node, pos));
+            match tok {
+                lexer::TokType::Assign => {
+                    pos = pos + 1;
+                    // something like a = 1
+                    let mut assign_node = ParseNode::new();
+                    assign_node.entry = NodeType::AssignNode(var_name.to_string(), false); // assign a int variable
+                    let (next_exp_node, pos) = r#try!(p_exp(toks, pos));
+                    assign_node.child.push(next_exp_node);
+                    return Ok((assign_node, pos));
+                }
+                lexer::TokType::LBracket => {
+                    // something like a[<exp>] = 1;
+                    let back_pos = pos-1;
+                    pos = pos + 1;
+                    // parse exp.
+                    let (index_node, new_pos) = r#try!(p_exp(toks, pos));
+                    pos = new_pos;
+                    // parse ']'
+                    if toks[pos] != lexer::TokType::RBracket {
+                        return Err(format!("Expected ']' for bracket closing, found {:?} at {}", toks[pos], pos));
+                    }
+
+                    // try '='
+                    pos = pos + 1;
+                    if toks[pos] != lexer::TokType::Assign {
+                        pos = back_pos;
+                        let (conditional_node, pos) = r#try!(p_conditional_exp(toks, pos));
+                        exp_node.child.push(conditional_node);
+                        return Ok((exp_node, pos));
+                    }
+                    pos = pos + 1;
+                    // try parse exp
+                    let mut assign_node = ParseNode::new();
+                    assign_node.entry = NodeType::AssignNode(var_name.to_string(), true); // assign to a array element
+                    let (res_node, new_pos) = r#try!(p_exp(toks, pos));
+                    pos = new_pos;
+                    assign_node.child.push(index_node);
+                    assign_node.child.push(res_node);
+                    return Ok((assign_node, pos));
+                }
+                _ => {
+                    pos = pos - 1;
+                    let (conditional_node, pos) = r#try!(p_conditional_exp(toks, pos));
+                    exp_node.child.push(conditional_node);
+                    return Ok((exp_node, pos));
+                }
             }
-            pos = pos + 1;
-            // something like a = 1
-            let mut assign_node = ParseNode::new();
-            assign_node.entry = NodeType::AssignNode(var_name.to_string());
-            let (next_exp_node, pos) = r#try!(p_exp(toks, pos));
-            assign_node.child.push(next_exp_node);
-            return Ok((assign_node, pos));
         }
         _ => {
             // try <conditional-exp>
@@ -307,18 +349,20 @@ fn p_declare(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize
     match tok {
         lexer::TokType::Kwd(lexer::KwdType::Int) => {
             // "int" <id> [ = <exp> ] ";"
+            // or "int" <id> "[" <int> "]" ";"
             let pos = pos + 1;
 
             let tok = &toks[pos];
             match tok {
                 lexer::TokType::Identifier(var_name) => {
                     let mut stmt_node = ParseNode::new();
-                    stmt_node.entry = NodeType::Declare(var_name.to_string());
+                    stmt_node.entry = NodeType::Declare(var_name.to_string(), DataType::I64);
                     let pos = pos + 1;
                     let tok = &toks[pos];
                     match tok {
                         lexer::TokType::Assign => {
                             // parse exp
+                            // e.g. int a = exp;
                             let pos = pos + 1;
                             let (exp_node, pos) = r#try!(p_exp(toks, pos));
 
@@ -335,8 +379,45 @@ fn p_declare(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize
                         }
                         lexer::TokType::Semicolon => {
                             // if just declare, but no assignment, just record the var_name
+                            // e.g. int var;
                             let pos = pos + 1;
                             return Ok((stmt_node, pos));
+                        }
+                        lexer::TokType::LBracket => {
+                            // array declare
+                            // e.g. int a[100];
+                            // XXX: now only just support literal array length
+                            if cfg!(feature = "debug") {
+                                println!("here in p_declare -> LBraket");
+                            }
+                            let mut declare_node = ParseNode::new();
+                            let pos = pos + 1;
+                            let tok = &toks[pos];
+                            match tok {
+                                lexer::TokType::Literal(n) => {
+                                    declare_node.entry = NodeType::Declare(var_name.to_string(), DataType::Arr64(*n));
+                                    let pos = pos + 1;
+                                    let tok = &toks[pos];
+                                    if *tok != lexer::TokType::RBracket {
+                                        return Err(format!("Expected `]` for array declaration, found {:?} at {}", toks[pos], pos));
+                                    }
+
+                                    let pos = pos + 1;
+                                    let tok = &toks[pos];
+                                    if *tok != lexer::TokType::Semicolon {
+                                        return Err(format!("Expected `;` at end of array declaration, found {:?} at {}", toks[pos], pos));
+                                    }
+                                    let pos = pos + 1;
+                                    if cfg!(feature = "debug") {
+                                        println!("got declare_node: {:?}", declare_node);
+                                    }
+                                    return Ok((declare_node, pos));
+                                }
+                                _ => {
+                                    return Err(format!("Expected Array length `literal`, found {:?} at {}", toks[pos], pos));
+                                }
+                            }
+
                         }
                         _ => {
                             return Err(format!(
@@ -438,7 +519,9 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
                 return Err(format!("Missing `(`"));
             }
             // try to parse exp
-            // println!("here pos = {}", pos);
+            if cfg!(feature = "debug") {
+                println!("here pos = {}", pos);
+            }
             let pos = pos + 1;
             let (exp_node, pos) = r#try!(p_exp(toks, pos));
             // println!("pos = {}", pos);
@@ -448,7 +531,9 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
 
             let pos = pos + 1;
             // try to parse statement
-            // println!("parse stmt from pos = {}", pos);
+            if cfg!(feature = "debug") {
+                println!("If: parse stmt from pos = {}, tok: {:?}", pos, toks[pos]);
+            }
             let (clause_1_node, pos) = r#try!(p_stmt(toks, pos));
             stmt_node.child.push(exp_node);
             stmt_node.child.push(clause_1_node);
@@ -496,6 +581,9 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
                         return Err(format!("Missing `)` needed by For"));
                     }
                     let pos = pos + 1;
+                    if cfg!(feature = "debug") {
+                        println!("pos: {} tok: {:?} before compound layer", pos, toks[pos]);
+                    }
                     let mut compound_layer_node = ParseNode::new();
                     compound_layer_node.entry = NodeType::Stmt(StmtType::Compound);
                     let (next_stmt_node, pos) = r#try!(p_stmt(toks, pos));
@@ -599,6 +687,7 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
             if pos >= toks.len() || toks[pos] != lexer::TokType::Semicolon {
                 return Err(format!("Missing `;` needed by continue"));
             }
+            let pos = pos + 1;
             return Ok((stmt_node, pos));
         }
         lexer::TokType::Kwd(lexer::KwdType::Break) => {
@@ -630,7 +719,9 @@ fn p_stmt(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), 
 }
 
 fn p_factor(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
-    // println!("in p_factor with pos: {}, tok = {:?}", pos, toks[pos]);
+    if cfg!(feature = "debug") {
+        println!("in p_factor with pos: {}, tok = {:?}", pos, toks[pos]);
+    }
     let mut next = &toks[pos];
     let mut pos = pos + 1;
 
@@ -682,6 +773,9 @@ fn p_factor(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize)
             return Ok((factor_node, pos));
         }
         lexer::TokType::Identifier(var_name) => {
+            if cfg!(feature = "debug") {
+                println!("here\n");
+            }
             if pos < toks.len() && toks[pos] == lexer::TokType::LParen {
                 // Factor -> FnCall
                 let mut factor_node = ParseNode::new();
@@ -689,6 +783,14 @@ fn p_factor(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize)
                 factor_node.entry = NodeType::Factor;
                 let (fn_call_node, pos) = r#try!(p_fn_call(toks, pos));
                 factor_node.child.push(fn_call_node);
+                return Ok((factor_node, pos));
+            } else if pos < toks.len() && toks[pos] == lexer::TokType::LBracket {
+                // Factor -> Array referencing
+                let mut factor_node = ParseNode::new();
+                pos = pos - 1;
+                factor_node.entry = NodeType::Factor;
+                let (arr_ref_node, pos) = r#try!(p_arr_ref(toks, pos));
+                factor_node.child.push(arr_ref_node);
                 return Ok((factor_node, pos));
             } else {
                 // Factor -> Var
@@ -705,6 +807,44 @@ fn p_factor(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize)
     }
 }
 
+fn p_arr_ref(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
+    // array reference ::= <id> "[" <exp> "]"
+    let mut arr_ref_node = ParseNode::new();
+    let mut var_name = String::new();
+    match &toks[pos] {
+        lexer::TokType::Identifier(name) => {
+            var_name = name.to_string();
+        }
+        _ => {
+            return Err(format!(
+                "Expected array identifier, foudn {:?} at {}", toks[pos], pos));
+        }
+    }
+    arr_ref_node.entry = NodeType::ArrayRef(var_name);
+
+    let mut pos = pos + 1;
+    // match '['
+    match toks[pos] {
+        lexer::TokType::LBracket => {
+            pos = pos + 1;
+        }
+        _ => {
+            return Err(format!("Expected `[` needed by array referencing, found {:?} at {}", toks[pos], pos));
+        }
+    }
+
+    let (exp_node, new_pos) = r#try!(p_exp(toks, pos));
+    arr_ref_node.child.push(exp_node);
+    match toks[new_pos] {
+        lexer::TokType::RBracket => {
+            pos = new_pos + 1;
+        }
+        _ => {
+            return Err(format!("Expected ']' needed by array referencing, found {:?} at {}", toks[pos], pos));
+        }
+    }
+    return Ok((arr_ref_node, pos));
+}
 fn p_fn_call(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
     // <function-call> ::= id "(" [ <exp> { "," <exp> } ] ")"
     //println!("in fn p_fn_call");
@@ -979,7 +1119,9 @@ pub fn parse_prog(input: &String, c_src_name: &String) -> Result<ParseNode, Stri
             }
             Err(_) => {
                 // try to parse fn definition
-                // println!("try to parse fn definition");
+                if cfg!(feature = "debug") {
+                    println!("try to parse fn definition");
+                }
                 let (fn_node, new_pos) = r#try!(p_fn(&toks, pos));
                 prog_node.child.push(fn_node);
                 pos = new_pos;
@@ -996,6 +1138,12 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
         idt_prefix = idt_prefix + "    ";
     }
     match &tree.entry {
+        NodeType::ArrayRef(var_name) => format!(
+            "{}n_type: ArrayRef, var_name : {}, [\n{}\n{}]",
+            idt_prefix, var_name,
+            print(tree.child.get(0).unwrap(), idt + 1),
+            idt_prefix
+        ),
         NodeType::Factor => format!(
             "{}n_type: Factor, [\n{}\n{}]",
             idt_prefix,
@@ -1005,16 +1153,33 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
             ),
             idt_prefix
         ),
-        NodeType::AssignNode(var_name) => format!(
-            "{}n_type: AssignNode, Var: {} [\n{}\n{}]",
-            idt_prefix,
-            var_name,
-            print(
-                tree.child.get(0).expect("Assign Node has no child"),
-                idt + 1
-            ),
-            idt_prefix
-        ),
+        NodeType::AssignNode(var_name, flag) => {
+            match flag {
+                false => {
+                    format!(
+                        "{}n_type: AssignNode, Var: {} [\n{}\n{}]",
+                        idt_prefix,
+                        var_name,
+                        print(
+                            tree.child.get(0).expect("Assign Node has no child"),
+                            idt + 1
+                        ),
+                        idt_prefix
+                    )
+                }
+                true => {
+                    // assign to array
+                    format!(
+                        "{}n_type: AssignNode array: {} [\n{}\n{}\n{}]",
+                        idt_prefix,
+                        var_name,
+                        print(tree.child.get(0).expect("Assign to array Node has no index node "), idt + 1),
+                        print(tree.child.get(1).expect("Assign to array node has no rhs"), idt + 1),
+                        idt_prefix,
+                    )
+                }
+            }
+        },
         NodeType::BinExp(op) => format!(
             "{}n_type: BinExp, Op: {} [\n{}\n{}\n{}]",
             idt_prefix,
@@ -1101,20 +1266,32 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
                 idt_prefix, fn_name, var_list_string, idt_prefix, tmp, idt_prefix
             )
         }
-        NodeType::Declare(var_name) => {
-            if tree.child.is_empty() {
-                format!("{}n_type: Declare, var_name: {}", idt_prefix, var_name)
-            } else {
-                format!(
-                    "{}n_type: Declare, var_name: {}, [\n{}\n{}]",
-                    idt_prefix,
-                    var_name,
-                    print(
-                        tree.child.get(0).expect("Declare Node has no child"),
-                        idt + 1
-                    ),
-                    idt_prefix
-                )
+        NodeType::Declare(var_name, t) => {
+            match t {
+                DataType::I64 => {
+                    if tree.child.is_empty() {
+                        format!("{}n_type: Declare, type: Int var_name: {}", idt_prefix, var_name)
+                    } else {
+                        format!(
+                            "{}n_type: Declare, type: Int var_name: {}, [\n{}\n{}]",
+                            idt_prefix,
+                            var_name,
+                            print(
+                                tree.child.get(0).expect("Declare Node has no child"),
+                                idt + 1
+                            ),
+                            idt_prefix
+                        )
+                    }
+                }
+                DataType::Arr64(len) => {
+                    format!(
+                        "{}n_type: Declare, type: Array  var_name: {}, length: {}",
+                        idt_prefix,
+                        var_name,
+                        len,
+                    )
+                }
             }
         }
         NodeType::ConditionalExp => {
