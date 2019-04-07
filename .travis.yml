@@ -6,6 +6,8 @@ rust:
   - nightly
 
 matrix:
+  allow_failures:
+    - rust: nightly
   include:
     # works on Precise and Trusty
     - os: linux
