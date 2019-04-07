@@ -62,6 +62,9 @@ Gcc is currently used as the back-end of the compiler to produce the binary from
 
 ## Running Tests
 
+Make sure you are running a Linux 64 bit system.
+
+Run:
 ```bash
 $ mkdir gen/
 $ ./test.sh
