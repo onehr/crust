@@ -91,7 +91,7 @@ You can try command after you have build the crust compiler:
 ```bash
 $ ./target/debug/crust sample_code/hello_crust.c hello_crust.s
 $ gcc hello_crust.s -o a.out
-$ a.out
+$ ./a.out
 ```
 You should get such texts printed in your terminal:
 ```
@@ -140,7 +140,7 @@ Run:
 ```bash
 $ ./target/debug/crust sample_code/bubble_sort.c bubble_sort.s
 $ gcc bubble_sort.s -o a.out
-$ a.out
+$ ./a.out
 ```
 
 You should see:
