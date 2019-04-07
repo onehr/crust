@@ -234,7 +234,6 @@ fn p_exp(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), S
 fn p_fn(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), String> {
     // println!("in p_fn with pos: {}", pos);
     // <function> ::= "int" <id> "(" ")" "{" { <statement> } "}"
-    // now add multi-statements support
     if pos >= toks.len() {
         return Err("Out of program length".to_string());
     }
@@ -263,12 +262,20 @@ fn p_fn(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), St
     pos = pos + 1;
     // XXX: add void support, now only support int arg list
     let mut arg_list: Vec<String> = Vec::new();
+    let mut arg_count = 0;
     while pos < toks.len() && toks[pos] != lexer::TokType::RParen {
         // try to parse argument list
         // match int
         match &toks[pos] {
             lexer::TokType::Kwd(lexer::KwdType::Int) => {
                 pos = pos + 1;
+            }
+            lexer::TokType::Kwd(lexer::KwdType::Void) => {
+                if (arg_count > 0) {
+                    return Err(format!("Error: void after other argument in one function definition"));
+                }
+                pos = pos + 1;
+                break;
             }
             _ => {
                 return Err(format!("Expected `int`, found {:?} at {}", toks[pos], pos));
@@ -287,6 +294,7 @@ fn p_fn(toks: &Vec<lexer::TokType>, pos: usize) -> Result<(ParseNode, usize), St
                 ));
             }
         }
+        arg_count = arg_count + 1;
         // match ,
         match &toks[pos] {
             lexer::TokType::Comma => {
