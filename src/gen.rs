@@ -206,11 +206,23 @@ pub fn gen_prog(tree: &ParseNode) -> String {
                 let mut scope: HashMap<String, bool> = HashMap::new();
                 match var_list_opt {
                     Some(var_list) => {
-                        for var in var_list {
-                            index_map.insert(var.to_string(), param_offset);
-                            scope.insert(var.to_string(), true);
-                            param_offset += 8;
+                        for i in 0..var_list.len() {
+                            scope.insert(var_list[i].to_string(), true);
+                            if i >= 6 {
+                                // this is stored in stack, starting from EBP + 16
+                                index_map.insert(var_list[i].to_string(), param_offset);
+                                param_offset += 8;
+                            } else {
+                                // stored in regs, we use offset from 0-5 as index to regs.
+                                // and use (i+1)*-8 as their index, cause we will push them one by one at the new frame stack
+                                index_map.insert(var_list[i].to_string(), - (i as isize +1) * 8);
+                            }
                         }
+                    //     for var in var_list {
+                    //         index_map.insert(var.to_string(), param_offset);
+                    //         scope.insert(var.to_string(), true);
+                    //         param_offset += 8;
+                    //     }
                     }
                     None => {}
                 }
@@ -551,7 +563,7 @@ pub fn gen_block(
     loop_in_label: Option<&str>,
     loop_out_label: Option<&str>,
     flag: bool,
-    call_by_fn: bool,
+    fn_def: bool,
     global_variable_scope: &HashSet<String>,
 ) -> String {
     let p = "        ".to_string(); // 8 white spaces
@@ -562,10 +574,20 @@ pub fn gen_block(
     let mut index_map = index_map.clone();
     let mut idx: isize = idx;
     let mut current_scope: HashMap<String, bool> = scope.clone();
-    if call_by_fn == false {
+    if fn_def == false {
         current_scope = HashMap::new();
+    } else {
+        // this is a function definition block
+        // we need to store the input argument in the stack
+        let regs : Vec<&'static str> = vec!["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
+        // first push them in stack
+        for i in 0..scope.len() {
+            stmts.push_str(&format!("{}pushq {}\n", p, regs[i]));
+        }
+        // XXX: cause right now the generated will use small amout of registers,
+        // but in the future will need to save callee-saved registers in the function stack
+
     }
-    // let mut scope: HashSet<String> = HashSet::new();
 
     for it in &tree.child {
         // iter through every block-item
@@ -622,12 +644,6 @@ pub fn gen_block(
         }
     }
 
-    // println!("scope : {:?}, deallocate = {}", current_scope, b_deallocate);
-    // let b_deallocate = match flag {
-    //     true => 8 * scope.len(),
-    //     false => 0,
-    // };
-    // let b_deallocate = 8 * scope.len(); // deallocate stack
     format!(
         "{}:\n\
          {}\
@@ -715,13 +731,25 @@ pub fn gen_stmt(
             }
         }
         NodeType::FnCall(fn_name) => {
+            // now change to x64 calling convetion
+            // arguments: 1st 2nd 3rd 4th 5th 6th ...
+            //            rdi rsi rdx rcx r8  r9  stack
             // iter every expression in reverse direction
             // and then push them in stack
+            /*
+            if (tree.child.len() > 6) {
+                panic!("Error: crust now don't support function with arguments more than 6")
+            }*/
             let mut s: String = String::new();
-            for it in tree.child.iter().rev() {
-                // generate expression
+
+            // first save the caller saves regs: r10, r11
+            s.push_str(&format!("{}pushq %r10\n", p));
+            s.push_str(&format!("{}pushq %r11\n", p));
+            // mov argument into registers.
+            let regs : Vec<&'static str> = vec!["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
+            for i in 0..tree.child.len() {
                 s.push_str(&gen_stmt(
-                    it,
+                    tree.child.get(i).unwrap(),
                     index_map,
                     idx,
                     lbb,
@@ -730,17 +758,42 @@ pub fn gen_stmt(
                     loop_out_label,
                     &global_variable_scope,
                 ));
-                // pushq
-                s.push_str(&format!("{}pushq %rax\n", p));
+                if (i >= 5) {
+                    // store in stack
+                    s.push_str(&format!("{}pushq %rax\n", p));
+                } else {
+                    // store into regs.
+                    s.push_str(&format!("{}movq %rax, {}\n", p, regs[i]));
+                }
             }
+            // for it in tree.child.iter().rev() {
+            //     // generate expression
+            //     s.push_str(&gen_stmt(
+            //         it,
+            //         index_map,
+            //         idx,
+            //         lbb,
+            //         leb,
+            //         loop_in_label,
+            //         loop_out_label,
+            //         &global_variable_scope,
+            //     ));
+            //     // pushq
+            //     s.push_str(&format!("{}pushq %rax\n", p));
+            // }
+
             // call the function
             s.push_str(&format!("{}call {}\n", p, fn_name));
             // after the callee function returns, remove the arguments from stack
-            s.push_str(&format!(
-                "{}addq ${}, %rsp # remove the arguments\n",
-                p,
-                8 * tree.child.len()
-            ));
+            if (tree.child.len() > 6) {
+                s.push_str(&format!(
+                    "{}addq ${}, %rsp # remove the arguments\n",
+                    p,
+                    8 * (tree.child.len()-6)
+                ));
+            }
+            s.push_str(&format!("{}popq %r11\n", p));
+            s.push_str(&format!("{}popq %r10\n", p));
             s
         }
         NodeType::Stmt(stmt) => match stmt {
