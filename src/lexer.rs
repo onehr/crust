@@ -51,6 +51,43 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
 
     while let Some(&c) = it.peek() {
         match c {
+            '\'' => {
+                // try parse a char
+                // now just use int to represent char
+                // transform it to int
+                it.next(); // skip '
+                let &c = it.peek().unwrap();
+                if (c == '\'') {return Err(format!("Error: empty character constant"));}
+                if (c == '\\') {
+                    it.next();
+                    let &c = it.peek().unwrap();
+                    match c {
+                        'a' => {result.push(TokType::Literal(0x07));} // Alert (Beep, Bell) (added in C89) 
+                        'b' => {result.push(TokType::Literal(0x08));} // Backspace
+                        'e' => {result.push(TokType::Literal(0x1B));} // escape character
+                        'f' => {result.push(TokType::Literal(0x0C));} // Formfeed Page Break
+                        'n' => {result.push(TokType::Literal(0x0A));} // Newline (Line Feed)
+                        'r' => {result.push(TokType::Literal(0x0D));} // Carriage Return
+                        't' => {result.push(TokType::Literal(0x09));} // Horizontal Tab
+                        'v' => {result.push(TokType::Literal(0x0B));} // Vertical Tab
+                        '\\' => {result.push(TokType::Literal(0x5C));}// Backslash
+                        '\'' => {result.push(TokType::Literal(0x27));}// Apostrophe or single quotation mark
+                        '\"' => {result.push(TokType::Literal(0x22));}// Double quotation mark
+                        '?' => {result.push(TokType::Literal(0x3F));} // question mark
+                        _ => {return Err(format!("unrecongnized character"));}
+                    }
+                    it.next();
+                    if it.peek().unwrap() != &'\'' {
+                        return Err(format!("Error: unmatched '"));
+                    }
+                    it.next();
+                }
+                else {
+                    result.push(TokType::Literal(c as i64));
+                    it.next(); // skip char
+                    it.next(); // skip '
+                }
+            },
             '0'...'9' => {
                 it.next();
                 let mut number = c
@@ -81,6 +118,7 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
                 }
                 match s.as_ref() {
                     "int" => result.push(TokType::Kwd(KwdType::Int)),
+                    "char" => result.push(TokType::Kwd(KwdType::Int)),
                     "return" => result.push(TokType::Kwd(KwdType::Ret)),
                     "void" => result.push(TokType::Kwd(KwdType::Void)),
                     "if" => result.push(TokType::Kwd(KwdType::If)),

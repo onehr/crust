@@ -21,7 +21,7 @@ I will add project todo-list soon for better organization.
 3. Unary Operators: `!`, `~`, `-`(Negation).
 4. Binary Operators: `||`, `&&`, `<`, `>`, `>=`, `<=`, `==`, `+`, `-`, `/`, `*`.
 5. Ternary Operator: `exp1 ? exp2 : exp3`.
-5. `int` data type.
+5. `int` and `char` data type.
 6. `if` keyword.
 7. `else` keyword.
 8. `for` keyword.
@@ -77,23 +77,23 @@ Due to the Beta state the compiler only supports a few features.
 At the moment, `main` can not take any input arguments, but functions can be defined and called.
 
 As the tradition in programmer community, we should print the "hello world" first,
-cause crust now only support int type, so you can do it this way.
+cause crust now only support `int` and `char` type, so we can do it this way.
 ```c
 int main() {
-        putchar(72);
-        putchar(101);
-        putchar(108);
-        putchar(108);
-        putchar(111);
-        putchar(44);
-        putchar(32);
-        putchar(67);
-        putchar(82);
-        putchar(85);
-        putchar(83);
-        putchar(84);
-        putchar(33);
-        putchar(10);
+        putchar('H');
+        putchar('e');
+        putchar('l');
+        putchar('l');
+        putchar('o');
+        putchar(',');
+        putchar(' ');
+        putchar('C');
+        putchar('R');
+        putchar('U');
+        putchar('S');
+        putchar('T');
+        putchar('!');
+        putchar('\n');
         return 0;
 }
 ```
