@@ -32,6 +32,7 @@ I will add project todo-list soon for better organization.
 14. Local scope binding.
 16. Function definition.
 17. Global variables.
+18. Global one-dimensional(1-D) Array
 
 ## Requirements
 
@@ -72,7 +73,13 @@ Due to the Beta state the compiler only supports a few features.
 
 At the moment, `main` can not take any input arguments, but functions can be defined and called.
 
-Here is one example that calculates the 10th [fibonacci number](https://en.wikipedia.org/wiki/Fibonacci_number) and demonstrates a few other basic math functions.
+Here is one example from file `test/valid/combine_4.c`.
+It defines a `fib` function and use it to calculate the 
+10th [fibonacci number](https://en.wikipedia.org/wiki/Fibonacci_number),
+then generate a fibonacci array,
+and use [bubble sort](https://www.wikiwand.com/en/Bubble_sort) algorithm 
+to sort an descend array `[99, 98, 97, ..., 1, 0]` to get an ascend array `[0, 1, ..., 98, 99]`, 
+and also demonstrates a few other basic math functions.
 
 ```c
 int fib(int a) {if (a == 0 || a == 1) {return a;} else {return fib(a - 1) + fib(a - 2);}}
@@ -85,10 +92,45 @@ int div(int a, int b) {return a / b;}
 int EXIT_SUCCESS = 0;
 int EXIT_FAILURE = 1;
 
+int arr[100];
+
 int main() {
         int a = 2;
         int b = 3;
         int n = 10;
+        int len = 100;
+
+        for (int i = 0; i < 30; i = i + 1) {
+                if (i == 0 || i == 1) arr[i] = i;
+                else arr[i] = arr[i-1] + arr[i-2];
+        }
+
+        for (int i = 0; i < 30; i = i + 1) {
+                if (arr[i] != fib(i)) return EXIT_FAILURE;
+        }
+
+        for (int i = 0; i < len; i = i + 1) {
+                arr[i] = len - 1 - i;
+        }
+
+        for (int i = 0; i < len; i = i + 1) {
+                if (arr[i] != len - 1 - i) return EXIT_FAILURE;
+        }
+
+        int tmp = 0;
+        for (int i = 0; i < len - 1; i = i + 1) {
+                for (int j = 0; j < len - 1 - i; j = j + 1)
+                        if (arr[j] > arr[j + 1]) {
+                                tmp = arr[j];
+                                arr[j] = arr[j + 1];
+                                arr[j + 1] = tmp;
+                        }
+        }
+
+        for (int i = 0; i < 100; i = i + 1) {
+                if (arr[i] != i) return EXIT_FAILURE;
+        }
+
 
         if (fib(n) != 55) return EXIT_FAILURE;
 
@@ -102,19 +144,21 @@ int main() {
 
         if (div(a, b) != 0) return EXIT_FAILURE;
 
-        return EXIT_SUCCESS;
+        return arr[len-1];
 }
 ```
 This can actually be an unit test, it can test every function works correctly,
-if everything goes fine, this program should retrun `EXIT_SUCCESS`, if there's something wrong, it will return 1,
+if everything goes fine, this program should retrun `arr[99]` which should be 99, 
+if there's something wrong, it will return 1,
 which is `EXIT_FAILURE`.
 
 If we use the `crust` compiler to compile this program and run the final executable file,
 the program will return 0, which is correct.
 
-The generated code would be some thing like this:
+The generated code would be some thing like this (The assmebly file contains too many lines, so I just paste a snippet of it)
+
 ```assembly
-        .file "test/valid/combine_2.c"
+        .file "test/valid/combine_4.c"
         .text
         .global fib
         .type fib, @function
@@ -272,235 +316,10 @@ min:
         .cfi_def_cfa 7, 8
         .cfi_endproc
 .LFE23:
-        .size   min, .-min
-        .text
-        .global sum
-        .type sum, @function
-sum:
+        ;;
+        ;; SKIP LOTS OF LINES
+        ;;
 .LFB24:
-        .cfi_startproc
-        pushq	%rbp
-        .cfi_def_cfa_offset 16
-        .cfi_offset 6, -16
-        movq	%rsp, %rbp
-        .cfi_def_cfa_register 6
-.LBB25:
-        movq 16(%rbp), %rax
-        pushq %rax
-        movq 24(%rbp), %rax
-        popq %rcx
-        addq %rcx, %rax
-        movq %rbp, %rsp
-        popq	%rbp
-        .cfi_def_cfa 7, 8
-        ret
-.LEB26:
-        addq $0, %rsp # block out
-        movq %rbp, %rsp
-        popq	%rbp
-        .cfi_def_cfa 7, 8
-        .cfi_endproc
-.LFE27:
-        .size   sum, .-sum
-        .text
-        .global mul
-        .type mul, @function
-mul:
-.LFB28:
-        .cfi_startproc
-        pushq	%rbp
-        .cfi_def_cfa_offset 16
-        .cfi_offset 6, -16
-        movq	%rsp, %rbp
-        .cfi_def_cfa_register 6
-.LBB29:
-        movq 16(%rbp), %rax
-        pushq %rax
-        movq 24(%rbp), %rax
-        popq %rcx
-        imul %rcx, %rax
-        movq %rbp, %rsp
-        popq	%rbp
-        .cfi_def_cfa 7, 8
-        ret
-.LEB30:
-        addq $0, %rsp # block out
-        movq %rbp, %rsp
-        popq	%rbp
-        .cfi_def_cfa 7, 8
-        .cfi_endproc
-.LFE31:
-        .size   mul, .-mul
-        .text
-        .global div
-        .type div, @function
-div:
-.LFB32:
-        .cfi_startproc
-        pushq	%rbp
-        .cfi_def_cfa_offset 16
-        .cfi_offset 6, -16
-        movq	%rsp, %rbp
-        .cfi_def_cfa_register 6
-.LBB33:
-        movq 24(%rbp), %rax
-        pushq %rax
-        movq 16(%rbp), %rax
-        popq %rcx
-        xorq %rdx, %rdx
-        idivq %rcx
-        movq %rbp, %rsp
-        popq	%rbp
-        .cfi_def_cfa 7, 8
-        ret
-.LEB34:
-        addq $0, %rsp # block out
-        movq %rbp, %rsp
-        popq	%rbp
-        .cfi_def_cfa 7, 8
-        .cfi_endproc
-.LFE35:
-        .size   div, .-div
-        .globl	EXIT_SUCCESS
-        .data
-        .align 8
-        .type	EXIT_SUCCESS, @object
-        .size	EXIT_SUCCESS, 8
-EXIT_SUCCESS:
-        .long	0
-        .globl	EXIT_FAILURE
-        .data
-        .align 8
-        .type	EXIT_FAILURE, @object
-        .size	EXIT_FAILURE, 8
-EXIT_FAILURE:
-        .long	1
-        .text
-        .global main
-        .type main, @function
-main:
-.LFB36:
-        .cfi_startproc
-        pushq	%rbp
-        .cfi_def_cfa_offset 16
-        .cfi_offset 6, -16
-        movq	%rsp, %rbp
-        .cfi_def_cfa_register 6
-.LBB37:
-        movq $2, %rax
-        pushq %rax
-        movq $3, %rax
-        pushq %rax
-        movq $10, %rax
-        pushq %rax
-        movq -24(%rbp), %rax
-        pushq %rax
-        call fib
-        addq $8, %rsp # remove the arguments
-        pushq %rax
-        movq $55, %rax
-        popq %rcx
-        cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise
-        movq $0, %rax   # zero out EAX, does not change flag
-        setne %al
-        cmpq $0, %rax
-        je .LS239
-        movq EXIT_FAILURE(%rip), %rax
-        movq %rbp, %rsp
-        popq	%rbp
-        .cfi_def_cfa 7, 8
-        ret
-        jmp .LENDIF40
-.LS239:
-.LENDIF40:
-        movq -16(%rbp), %rax
-        pushq %rax
-        movq -8(%rbp), %rax
-        pushq %rax
-        call min
-        addq $16, %rsp # remove the arguments
-        pushq %rax
-        movq $2, %rax
-        popq %rcx
-        cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise
-        movq $0, %rax   # zero out EAX, does not change flag
-        setne %al
-        cmpq $0, %rax
-        je .LS241
-        movq EXIT_FAILURE(%rip), %rax
-        movq %rbp, %rsp
-        popq	%rbp
-        .cfi_def_cfa 7, 8
-        ret
-        jmp .LENDIF42
-.LS241:
-.LENDIF42:
-        movq -16(%rbp), %rax
-        pushq %rax
-        movq -8(%rbp), %rax
-        pushq %rax
-        call max
-        addq $16, %rsp # remove the arguments
-        pushq %rax
-        movq $3, %rax
-        popq %rcx
-        cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise
-        movq $0, %rax   # zero out EAX, does not change flag
-        setne %al
-        cmpq $0, %rax
-        je .LS243
-        movq EXIT_FAILURE(%rip), %rax
-        movq %rbp, %rsp
-        popq	%rbp
-        .cfi_def_cfa 7, 8
-        ret
-        jmp .LENDIF44
-.LS243:
-.LENDIF44:
-        movq -16(%rbp), %rax
-        pushq %rax
-        movq -8(%rbp), %rax
-        pushq %rax
-        call sum
-        addq $16, %rsp # remove the arguments
-        pushq %rax
-        movq $5, %rax
-        popq %rcx
-        cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise
-        movq $0, %rax   # zero out EAX, does not change flag
-        setne %al
-        cmpq $0, %rax
-        je .LS245
-        movq EXIT_FAILURE(%rip), %rax
-        movq %rbp, %rsp
-        popq	%rbp
-        .cfi_def_cfa 7, 8
-        ret
-        jmp .LENDIF46
-.LS245:
-.LENDIF46:
-        movq -16(%rbp), %rax
-        pushq %rax
-        movq -8(%rbp), %rax
-        pushq %rax
-        call mul
-        addq $16, %rsp # remove the arguments
-        pushq %rax
-        movq $6, %rax
-        popq %rcx
-        cmpq %rax, %rcx # set ZF on if %rax == %rcx, set it off otherwise
-        movq $0, %rax   # zero out EAX, does not change flag
-        setne %al
-        cmpq $0, %rax
-        je .LS247
-        movq EXIT_FAILURE(%rip), %rax
-        movq %rbp, %rsp
-        popq	%rbp
-        .cfi_def_cfa 7, 8
-        ret
-        jmp .LENDIF48
-.LS247:
-.LENDIF48:
         movq -16(%rbp), %rax
         pushq %rax
         movq -8(%rbp), %rax
@@ -514,27 +333,38 @@ main:
         movq $0, %rax   # zero out EAX, does not change flag
         setne %al
         cmpq $0, %rax
-        je .LS249
+        je .LS2103
         movq EXIT_FAILURE(%rip), %rax
         movq %rbp, %rsp
         popq	%rbp
         .cfi_def_cfa 7, 8
         ret
-        jmp .LENDIF50
-.LS249:
-.LENDIF50:
-        movq EXIT_SUCCESS(%rip), %rax
+        jmp .LENDIF104
+.LS2103:
+.LENDIF104:
+        movq $1, %rax
+        pushq %rax
+        movq -32(%rbp), %rax
+        popq %rcx
+        subq %rcx, %rax
+        pushq %rdx
+        pushq %rbx
+        movq %rax, %rdx
+        movq arr@GOTPCREL(%rip), %rbx
+        movq (%rbx, %rdx, 8), %rax
+        popq %rbx
+        popq %rdx
         movq %rbp, %rsp
         popq	%rbp
         .cfi_def_cfa 7, 8
         ret
 .LEB38:
-        addq $24, %rsp # block out
+        addq $40, %rsp # block out
         movq %rbp, %rsp
         popq	%rbp
         .cfi_def_cfa 7, 8
         .cfi_endproc
-.LFE51:
+.LFE105:
         .size   main, .-main
         .ident	"crust: 0.1 (By Haoran Wang)"
         .section	.note.GNU-stack,"",@progbits
