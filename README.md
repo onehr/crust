@@ -33,6 +33,7 @@ I will add project todo-list soon for better organization.
 16. Function definition.
 17. Global variables.
 18. Global one-dimensional(1-D) Array
+19. `string` literals.
 
 ## Requirements
 
@@ -76,28 +77,79 @@ Due to the Beta state the compiler only supports a few features.
 
 At the moment, `main` can not take any input arguments, but functions can be defined and called.
 
-As the tradition in programmer community, we should print the "hello world" first,
-cause crust now only support `int` and `char` type, so we can do it this way.
+As the tradition in programmer community, we should print the "hello world" first.
+Code: `sample_code/hello_crust.c`
 ```c
-int main() {
-        putchar('H');
-        putchar('e');
-        putchar('l');
-        putchar('l');
-        putchar('o');
-        putchar(',');
-        putchar(' ');
-        putchar('C');
-        putchar('R');
-        putchar('U');
-        putchar('S');
-        putchar('T');
-        putchar('!');
-        putchar('\n');
+int main(void) {
+	printf("Hello, CRUST!\n");
+	printf("This is a simple sample code that can be compiled by crust.\n");	
+	return 0;
+}
+```
+
+You can try command after you have build the crust compiler:
+```bash
+$ ./target/debug/crust sample_code/hello_crust.c hello_crust.s
+$ gcc hello_crust.s -o a.out
+$ a.out
+```
+You should get such texts printed in your terminal:
+```
+Hello, CRUST!
+This is a simple sample code that can be compiled by crust.
+```
+
+Then you can also print some more interesting data now:
+Code: `sample_code/bubble_sort.c`
+```c
+int a[15];
+
+int main(void) {
+        int tmp;
+
+        for (int i = 0; i < 15; i = i + 1) {
+                a[i] = 15 - i;
+        }
+
+        printf("Before bubble sort:\n");
+        for (int i = 0; i < 15; i = i + 1) {
+                printf("%d ", a[i]);
+        }
+        printf("\n");
+
+        int len = 15;
+        for (int i = 0; i < len - 1; i = i + 1) {
+                for (int j = 0; j < len - 1 - i; j = j + 1)
+                        if (a[j] > a[j + 1]) {
+                                tmp = a[j];
+                                a[j] = a[j + 1];
+                                a[j + 1] = tmp;
+                        }
+        }
+
+        printf("After bubble sort:\n");
+        for (int i = 0; i < 15; i = i + 1) {
+                printf("%d ", a[i]);
+        }
+        printf("\n");
+
         return 0;
 }
 ```
-This program will prints `Hello, CRUST!` in your terminal.
+Run:
+```bash
+$ ./target/debug/crust sample_code/bubble_sort.c bubble_sort.s
+$ gcc bubble_sort.s -o a.out
+$ a.out
+```
+
+You should see:
+```
+Before bubble sort:
+15 14 13 12 11 10 9 8 7 6 5 4 3 2 1
+After bubble sort:
+1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+```
 
 And here is one more complex example from file `test/valid/combine_4.c`.
 It defines a `fib` function and use it to calculate the 
