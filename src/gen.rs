@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 use crate::lexer::TokType;
-use crate::parser::{NodeType, ParseNode, StmtType, DataType};
+use crate::parser::{DataType, NodeType, ParseNode, StmtType};
 use std::collections::{HashMap, HashSet};
 
 // generate a std::String contains the assembly language code
 static mut LABEL_COUNTER: i64 = -1;
-fn gen_labels(prefix: String) -> String {
+fn gen_labels(prefix: &str) -> String {
     unsafe {
         LABEL_COUNTER = LABEL_COUNTER + 1;
         return format!(".L{}{}", prefix, LABEL_COUNTER);
@@ -19,7 +19,7 @@ fn fn_main_has_ret() {
     }
 }
 
-fn gen_fn_prologue(fn_name: String) -> String {
+fn gen_fn_prologue(fn_name: &str) -> String {
     let p = "        ";
     format!(
         "{}.text\n\
@@ -40,7 +40,7 @@ fn gen_fn_prologue(fn_name: String) -> String {
         p,
         fn_name,
         fn_name,
-        gen_labels("FB".to_string()),
+        gen_labels("FB"),
         p,
         p,
         p,
@@ -177,7 +177,7 @@ pub fn gen_prog(tree: &ParseNode) -> String {
                     // just put them in .comm
                     // now we use value has 8 bytes by default.
                     // XXX: should be vary-length based on the data type.
-                    prog_body.push_str(&format!("{}.comm {}, 8, 8\n", p, var_name, ))
+                    prog_body.push_str(&format!("{}.comm {}, 8, 8\n", p, var_name,))
                 } else {
                     let val = compute_const(&it.child.get(0).unwrap());
                     prog_body.push_str(&format!(
@@ -197,7 +197,7 @@ pub fn gen_prog(tree: &ParseNode) -> String {
                 prog_body.push_str(&format!("{}.comm {}, {}, 32\n", p, var_name, len * 8));
             }
             NodeType::Fn(fn_name, var_list_opt) => {
-                let fn_prologue = gen_fn_prologue(fn_name.to_string());
+                let fn_prologue = gen_fn_prologue(fn_name);
                 let fn_epilogue = gen_fn_epilogue();
                 // cause in function, we have to pass the offset of argument and scope contains argument
                 // to function body
@@ -216,7 +216,7 @@ pub fn gen_prog(tree: &ParseNode) -> String {
                             } else {
                                 // stored in regs, we use offset from 0-5 as index to regs.
                                 // and use (i+1)*-8 as their index, cause we will push them one by one at the new frame stack
-                                index_map.insert(var_list[i].to_string(), - (i as isize +1) * 8);
+                                index_map.insert(var_list[i].to_string(), -(i as isize + 1) * 8);
                             }
                         }
                     }
@@ -260,7 +260,7 @@ pub fn gen_prog(tree: &ParseNode) -> String {
                     tmp,
                     fn_epilogue,
                     p,
-                    gen_labels("FE".to_string()),
+                    gen_labels("FE"),
                     p,
                     fn_name,
                     fn_name
@@ -367,8 +367,8 @@ pub fn gen_for(
     global_variable_scope: &HashSet<String>,
 ) -> String {
     let p = "        ".to_string();
-    let label_begin_loop = gen_labels("BFOR".to_string());
-    let label_end_loop = gen_labels("EFOR".to_string());
+    let label_begin_loop = gen_labels("BFOR");
+    let label_end_loop = gen_labels("EFOR");
 
     let mut index_map = index_map.clone();
     let mut idx: isize = idx;
@@ -563,8 +563,8 @@ pub fn gen_block(
     global_variable_scope: &HashSet<String>,
 ) -> String {
     let p = "        ".to_string(); // 8 white spaces
-    let label_begin_block = gen_labels("BB".to_string());
-    let label_end_block = gen_labels("EB".to_string());
+    let label_begin_block = gen_labels("BB");
+    let label_end_block = gen_labels("EB");
     // iter every block
     let mut stmts = String::new();
     let mut index_map = index_map.clone();
@@ -576,7 +576,7 @@ pub fn gen_block(
         // this is a function definition block
         // we need to store the input argument in the stack
         // first push them in stack
-        let regs : Vec<&'static str> = vec!["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
+        let regs: Vec<&'static str> = vec!["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
         if (current_scope.len() > 6) {
             for i in 0..6 {
                 stmts.push_str(&format!("{}pushq {}\n", p, regs[i]));
@@ -588,7 +588,6 @@ pub fn gen_block(
         }
         // XXX: cause right now the generated will use small amout of registers,
         // but in the future will need to save callee-saved registers in the function stack
-
     }
 
     for it in &tree.child {
@@ -667,15 +666,14 @@ pub fn gen_stmt(
 ) -> String {
     let p = "        ".to_string(); // 8 white spaces
     match &tree.entry {
-        NodeType::StringLiteral(data, tag) => {
-            format!(
-                "{}.section .rodata\n\
-                 {}:\n\
-                 {}.string \"{}\"\n\
-                 {}.text\n\
-                 {}leaq {}(%rip), %rax\n",p, tag,p, data, p, p, tag,
-            )
-        },
+        NodeType::StringLiteral(data, tag) => format!(
+            "{}.section .rodata\n\
+             {}:\n\
+             {}.string \"{}\"\n\
+             {}.text\n\
+             {}leaq {}(%rip), %rax\n",
+            p, tag, p, data, p, p, tag,
+        ),
         NodeType::ConditionalExp => {
             if tree.child.len() == 1 {
                 // just one <logical-or-exp>
@@ -724,8 +722,8 @@ pub fn gen_stmt(
                     &global_variable_scope,
                 );
 
-                let label_e3 = gen_labels(format!("E3"));
-                let label_end = gen_labels(format!("ENDCOND"));
+                let label_e3 = gen_labels("E3");
+                let label_end = gen_labels("ENDCOND");
                 format!(
                     "{}\
                      {}cmpq $0, %rax\n\
@@ -757,7 +755,7 @@ pub fn gen_stmt(
             s.push_str(&format!("{}pushq %r10\n", p));
             s.push_str(&format!("{}pushq %r11\n", p));
             // mov argument into registers.
-            let regs : Vec<&'static str> = vec!["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
+            let regs: Vec<&'static str> = vec!["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
             for i in 0..tree.child.len() {
                 s.push_str(&gen_stmt(
                     tree.child.get(i).unwrap(),
@@ -774,7 +772,10 @@ pub fn gen_stmt(
                     s.push_str(&format!("{}pushq %rax\n", p));
                 } else {
                     // store into regs.
-                    s.push_str(&format!("{}movq %rax, {}\n{}movq $0, %rax\n", p, regs[i], p));
+                    s.push_str(&format!(
+                        "{}movq %rax, {}\n{}movq $0, %rax\n",
+                        p, regs[i], p
+                    ));
                 }
             }
             // for it in tree.child.iter().rev() {
@@ -800,7 +801,7 @@ pub fn gen_stmt(
                 s.push_str(&format!(
                     "{}addq ${}, %rsp # remove the arguments\n",
                     p,
-                    8 * (tree.child.len()-6)
+                    8 * (tree.child.len() - 6)
                 ));
             }
             s.push_str(&format!("{}popq %r11\n", p));
@@ -860,8 +861,8 @@ pub fn gen_stmt(
                         &global_variable_scope,
                     )
                 };
-                let label_s2 = gen_labels(format!("S2"));
-                let label_end = gen_labels(format!("ENDIF"));
+                let label_s2 = gen_labels("S2");
+                let label_end = gen_labels("ENDIF");
                 format!(
                     "{}\
                      {}cmpq $0, %rax\n\
@@ -902,8 +903,8 @@ pub fn gen_stmt(
                 // cmpq $1, %rax
                 // je  LBB
                 // LEB
-                let lbb = gen_labels("BDO".to_string());
-                let leb = gen_labels("EDO".to_string());
+                let lbb = gen_labels("BDO");
+                let leb = gen_labels("EDO");
                 let scope: HashMap<String, bool> = HashMap::new();
                 let stmts = gen_block(
                     tree.child.get(0).unwrap(),
@@ -944,8 +945,8 @@ pub fn gen_stmt(
                 // stmt
                 // jmp LBB
                 // LEB.
-                let lbb = gen_labels("BWHILE".to_string());
-                let leb = gen_labels("EWHILE".to_string());
+                let lbb = gen_labels("BWHILE");
+                let leb = gen_labels("EWHILE");
                 let scope: HashMap<String, bool> = HashMap::new();
                 let exp = gen_stmt(
                     tree.child.get(0).unwrap(),
@@ -1019,15 +1020,9 @@ pub fn gen_stmt(
                  {}movq (%rbx, %rdx, 8), %rax\n\
                  {}popq %rbx\n\
                  {}popq %rdx\n",
-                get_index,
-                p,
-                p,
-                p,
-                p, var_name,
-                p,
-                p,p,
+                get_index, p, p, p, p, var_name, p, p, p,
             )
-        },
+        }
         NodeType::AssignNode(var_name, true) => {
             match index_map.get(var_name) {
                 None => {
@@ -1067,11 +1062,7 @@ pub fn gen_stmt(
                                  {}\
                                  {}movq {}@GOTPCREL(%rip), %rbx\n\
                                  {}movq %rax, (%rbx, %rdx, 8)\n",
-                                get_index,
-                                p,
-                                get_res,
-                                p, var_name,
-                                p,
+                                get_index, p, get_res, p, var_name, p,
                             )
                         }
                         false => {
@@ -1492,8 +1483,8 @@ pub fn gen_stmt(
                     p
                 ),
                 TokType::Or => {
-                    let clause2_label = gen_labels(format!("CLAUSE"));
-                    let end_label = gen_labels(format!("END"));
+                    let clause2_label = gen_labels("CLAUSE");
+                    let end_label = gen_labels("END");
                     format!(
                         "{}\
                          {}cmpq $0, %rax\n\
@@ -1540,8 +1531,8 @@ pub fn gen_stmt(
                     )
                 }
                 TokType::And => {
-                    let clause2_label = gen_labels(format!("clause"));
-                    let end_label = gen_labels(format!("end"));
+                    let clause2_label = gen_labels("clause");
+                    let end_label = gen_labels("end");
                     format!(
                         "{}\
                          {}cmpq $0, %rax\n\
