@@ -40,7 +40,7 @@ fn gen_fn_prologue(fn_name: &str) -> String {
         p,
         fn_name,
         fn_name,
-        gen_labels("FB".to_string()),
+        gen_labels("FB"),
         p,
         p,
         p,
@@ -197,7 +197,7 @@ pub fn gen_prog(tree: &ParseNode) -> String {
                 prog_body.push_str(&format!("{}.comm {}, {}, 32\n", p, var_name, len * 8));
             }
             NodeType::Fn(fn_name, var_list_opt) => {
-                let fn_prologue = gen_fn_prologue(fn_name.to_string());
+                let fn_prologue = gen_fn_prologue(fn_name);
                 let fn_epilogue = gen_fn_epilogue();
                 // cause in function, we have to pass the offset of argument and scope contains argument
                 // to function body
@@ -260,7 +260,7 @@ pub fn gen_prog(tree: &ParseNode) -> String {
                     tmp,
                     fn_epilogue,
                     p,
-                    gen_labels("FE".to_string()),
+                    gen_labels("FE"),
                     p,
                     fn_name,
                     fn_name
@@ -367,8 +367,8 @@ pub fn gen_for(
     global_variable_scope: &HashSet<String>,
 ) -> String {
     let p = "        ".to_string();
-    let label_begin_loop = gen_labels("BFOR".to_string());
-    let label_end_loop = gen_labels("EFOR".to_string());
+    let label_begin_loop = gen_labels("BFOR");
+    let label_end_loop = gen_labels("EFOR");
 
     let mut index_map = index_map.clone();
     let mut idx: isize = idx;
@@ -563,8 +563,8 @@ pub fn gen_block(
     global_variable_scope: &HashSet<String>,
 ) -> String {
     let p = "        ".to_string(); // 8 white spaces
-    let label_begin_block = gen_labels("BB".to_string());
-    let label_end_block = gen_labels("EB".to_string());
+    let label_begin_block = gen_labels("BB");
+    let label_end_block = gen_labels("EB");
     // iter every block
     let mut stmts = String::new();
     let mut index_map = index_map.clone();
@@ -722,8 +722,8 @@ pub fn gen_stmt(
                     &global_variable_scope,
                 );
 
-                let label_e3 = gen_labels(format!("E3"));
-                let label_end = gen_labels(format!("ENDCOND"));
+                let label_e3 = gen_labels("E3");
+                let label_end = gen_labels("ENDCOND");
                 format!(
                     "{}\
                      {}cmpq $0, %rax\n\
@@ -861,8 +861,8 @@ pub fn gen_stmt(
                         &global_variable_scope,
                     )
                 };
-                let label_s2 = gen_labels(format!("S2"));
-                let label_end = gen_labels(format!("ENDIF"));
+                let label_s2 = gen_labels("S2");
+                let label_end = gen_labels("ENDIF");
                 format!(
                     "{}\
                      {}cmpq $0, %rax\n\
@@ -903,8 +903,8 @@ pub fn gen_stmt(
                 // cmpq $1, %rax
                 // je  LBB
                 // LEB
-                let lbb = gen_labels("BDO".to_string());
-                let leb = gen_labels("EDO".to_string());
+                let lbb = gen_labels("BDO");
+                let leb = gen_labels("EDO");
                 let scope: HashMap<String, bool> = HashMap::new();
                 let stmts = gen_block(
                     tree.child.get(0).unwrap(),
@@ -945,8 +945,8 @@ pub fn gen_stmt(
                 // stmt
                 // jmp LBB
                 // LEB.
-                let lbb = gen_labels("BWHILE".to_string());
-                let leb = gen_labels("EWHILE".to_string());
+                let lbb = gen_labels("BWHILE");
+                let leb = gen_labels("EWHILE");
                 let scope: HashMap<String, bool> = HashMap::new();
                 let exp = gen_stmt(
                     tree.child.get(0).unwrap(),
@@ -1483,8 +1483,8 @@ pub fn gen_stmt(
                     p
                 ),
                 TokType::Or => {
-                    let clause2_label = gen_labels(format!("CLAUSE"));
-                    let end_label = gen_labels(format!("END"));
+                    let clause2_label = gen_labels("CLAUSE");
+                    let end_label = gen_labels("END");
                     format!(
                         "{}\
                          {}cmpq $0, %rax\n\
@@ -1531,8 +1531,8 @@ pub fn gen_stmt(
                     )
                 }
                 TokType::And => {
-                    let clause2_label = gen_labels(format!("clause"));
-                    let end_label = gen_labels(format!("end"));
+                    let clause2_label = gen_labels("clause");
+                    let end_label = gen_labels("end");
                     format!(
                         "{}\
                          {}cmpq $0, %rax\n\
