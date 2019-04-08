@@ -34,6 +34,8 @@ I will add project todo-list soon for better organization.
 17. Global variables.
 18. Global one-dimensional(1-D) Array
 19. `string` literals.
+20. `&` operator for variables.
+21. Follow System V ABI (working on, can call function like `printf` or `scanf` in your main function now).
 
 ## Requirements
 
@@ -77,7 +79,8 @@ Due to the Beta state the compiler only supports a few features.
 
 At the moment, `main` can not take any input arguments, but functions can be defined and called.
 
-As the tradition in programmer community, we should print the "hello world" first.
+Let's follow the tradition and print the "hello world" first.
+
 Code: `sample_code/hello_crust.c`
 ```c
 int main(void) {
@@ -99,59 +102,73 @@ Hello, CRUST!
 This is a simple sample code that can be compiled by crust.
 ```
 
-Then you can also print some more interesting data now:
-Code: `sample_code/bubble_sort.c`
+Then you can also print some more interesting data now, you can see the code in `sample_code/input_data_sort.c`.
 ```c
-int a[15];
+int array[100];
 
 int main(void) {
-        int tmp;
+        int len;
+        scanf("%d", &len);
 
-        for (int i = 0; i < 15; i = i + 1) {
-                a[i] = 15 - i;
+        for (int i = 0; i < len; i = i + 1) {
+                int data;
+                scanf("%d", &data);
+                array[i] = data;
         }
 
-        printf("Before bubble sort:\n");
-        for (int i = 0; i < 15; i = i + 1) {
-                printf("%d ", a[i]);
+        printf("your input array:\n");
+        for (int i = 0; i < len; i = i + 1) {
+                printf("%d ", array[i]);
         }
         printf("\n");
 
-        int len = 15;
+        int tmp;
         for (int i = 0; i < len - 1; i = i + 1) {
                 for (int j = 0; j < len - 1 - i; j = j + 1)
-                        if (a[j] > a[j + 1]) {
-                                tmp = a[j];
-                                a[j] = a[j + 1];
-                                a[j + 1] = tmp;
+                        if (array[j] > array[j + 1]) {
+                                tmp = array[j];
+                                array[j] = array[j + 1];
+                                array[j + 1] = tmp;
                         }
         }
 
-        printf("After bubble sort:\n");
-        for (int i = 0; i < 15; i = i + 1) {
-                printf("%d ", a[i]);
+        printf("After sort:\n");
+        for (int i = 0; i < len; i = i + 1) {
+                printf("%d ", array[i]);
         }
         printf("\n");
-
         return 0;
 }
 ```
 Run:
 ```bash
-$ ./target/debug/crust sample_code/bubble_sort.c bubble_sort.s
-$ gcc bubble_sort.s -o a.out
+$ ./target/debug/crust sample_code/input_data_sort.c input_data_sort.s
+$ gcc input_data_sort.s -o a.out
 $ ./a.out
+```
+Then you can run the program waiting for you to input data, or you can input the data in a text file
+and run it with re-direction command, this should also work:
+```bash
+$ ./a.out < tmp.txt
+```
+
+If you input data like:
+```
+10
+3 4 6 7 8 9 10 1 0 100
 ```
 
 You should see:
 ```
-Before bubble sort:
-15 14 13 12 11 10 9 8 7 6 5 4 3 2 1
-After bubble sort:
-1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+your input array:
+3 4 6 7 8 9 10 1 0 100
+After sort:
+0 1 3 4 6 7 8 9 10 100
 ```
 
-And here is one more complex example from file `test/valid/combine_4.c`.
+It works now!
+
+And here is one test example from file `test/valid/combine_4.c`.
 It defines a `fib` function and use it to calculate the 
 10th [fibonacci number](https://en.wikipedia.org/wiki/Fibonacci_number),
 then generate a fibonacci array,
@@ -225,7 +242,7 @@ int main() {
         return arr[len-1];
 }
 ```
-This can actually be an unit test, it can test every function works correctly,
+This is actually an unit test, it can test every function works correctly,
 if everything goes fine, this program should retrun `arr[99]` which should be 99, 
 if there's something wrong, it will return 1,
 which is `EXIT_FAILURE`.
