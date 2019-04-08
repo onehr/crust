@@ -111,9 +111,7 @@ int main(void) {
         scanf("%d", &len);
 
         for (int i = 0; i < len; i = i + 1) {
-                int data;
-                scanf("%d", &data);
-                array[i] = data;
+                scanf("%d", &array[i]);
         }
 
         printf("your input array:\n");
