@@ -3,20 +3,20 @@ use crate::lexer::TokType;
 use crate::parser::{DataType, NodeType, ParseNode, StmtType};
 use std::collections::{HashMap, HashSet};
 
+use std::sync::atomic;
+
 // generate a std::String contains the assembly language code
-static mut LABEL_COUNTER: i64 = -1;
+static LABEL_COUNTER: atomic::AtomicUsize = atomic::AtomicUsize::new(0);
 fn gen_labels(prefix: &str) -> String {
-    unsafe {
-        LABEL_COUNTER = LABEL_COUNTER + 1;
-        return format!(".L{}{}", prefix, LABEL_COUNTER);
-    }
+    let label_counter = LABEL_COUNTER.fetch_add(1, atomic::Ordering::SeqCst);
+    let label = format!(".L{}{}", prefix, label_counter);
+
+    label
 }
 
-static mut FLAG_FOR_MAIN_HAS_RET: bool = true;
+static FLAG_FOR_MAIN_HAS_RET: atomic::AtomicBool = atomic::AtomicBool::new(false);
 fn fn_main_has_ret() {
-    unsafe {
-        FLAG_FOR_MAIN_HAS_RET = true;
-    }
+    FLAG_FOR_MAIN_HAS_RET.swap(true, atomic::Ordering::SeqCst);
 }
 
 fn gen_fn_prologue(fn_name: &str) -> String {
@@ -233,19 +233,18 @@ pub fn gen_prog(tree: &ParseNode) -> String {
                     call_by_function,
                     &global_variable_scope,
                 );
-                let tmp = unsafe {
-                    if FLAG_FOR_MAIN_HAS_RET == false {
-                        format!(
-                            "{}movq $0, %rax\n\
-                             {}\
-                             {}ret\n",
-                            p,
-                            gen_fn_epilogue(),
-                            p
-                        )
-                    } else {
-                        "".to_string()
-                    }
+
+                let tmp = if FLAG_FOR_MAIN_HAS_RET.load(atomic::Ordering::SeqCst) == false {
+                    format!(
+                        "{}movq $0, %rax\n\
+                         {}\
+                         {}ret\n",
+                        p,
+                        gen_fn_epilogue(),
+                        p
+                    )
+                } else {
+                    "".to_string()
                 };
                 let fn_tot = format!(
                     "{}\
