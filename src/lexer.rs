@@ -52,7 +52,7 @@ fn gen_string_tag() -> String {
         return format!(".LSTR{}", LABEL_COUNTER);
     }
 }
-pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
+pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
     let mut result = Vec::new();
 
     let mut it = input.chars().peekable();
@@ -63,7 +63,9 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
                 it.next();
                 let mut s = "".to_string();
                 while let &c = it.peek().unwrap() {
-                    if (c == '"') {break;}
+                    if (c == '"') {
+                        break;
+                    }
                     s.push(c);
                     it.next();
                 }
@@ -76,37 +78,64 @@ pub fn lex(input: &String) -> Result<Vec<TokType>, String> {
                 // transform it to int
                 it.next(); // skip '
                 let &c = it.peek().unwrap();
-                if (c == '\'') {return Err(format!("Error: empty character constant"));}
+                if (c == '\'') {
+                    return Err(format!("Error: empty character constant"));
+                }
                 if (c == '\\') {
                     it.next();
                     let &c = it.peek().unwrap();
                     match c {
-                        'a' => {result.push(TokType::Literal(0x07));} // Alert (Beep, Bell) (added in C89) 
-                        'b' => {result.push(TokType::Literal(0x08));} // Backspace
-                        'e' => {result.push(TokType::Literal(0x1B));} // escape character
-                        'f' => {result.push(TokType::Literal(0x0C));} // Formfeed Page Break
-                        'n' => {result.push(TokType::Literal(0x0A));} // Newline (Line Feed)
-                        'r' => {result.push(TokType::Literal(0x0D));} // Carriage Return
-                        't' => {result.push(TokType::Literal(0x09));} // Horizontal Tab
-                        'v' => {result.push(TokType::Literal(0x0B));} // Vertical Tab
-                        '\\' => {result.push(TokType::Literal(0x5C));}// Backslash
-                        '\'' => {result.push(TokType::Literal(0x27));}// Apostrophe or single quotation mark
-                        '\"' => {result.push(TokType::Literal(0x22));}// Double quotation mark
-                        '?' => {result.push(TokType::Literal(0x3F));} // question mark
-                        _ => {return Err(format!("unrecongnized character"));}
+                        'a' => {
+                            result.push(TokType::Literal(0x07));
+                        } // Alert (Beep, Bell) (added in C89)
+                        'b' => {
+                            result.push(TokType::Literal(0x08));
+                        } // Backspace
+                        'e' => {
+                            result.push(TokType::Literal(0x1B));
+                        } // escape character
+                        'f' => {
+                            result.push(TokType::Literal(0x0C));
+                        } // Formfeed Page Break
+                        'n' => {
+                            result.push(TokType::Literal(0x0A));
+                        } // Newline (Line Feed)
+                        'r' => {
+                            result.push(TokType::Literal(0x0D));
+                        } // Carriage Return
+                        't' => {
+                            result.push(TokType::Literal(0x09));
+                        } // Horizontal Tab
+                        'v' => {
+                            result.push(TokType::Literal(0x0B));
+                        } // Vertical Tab
+                        '\\' => {
+                            result.push(TokType::Literal(0x5C));
+                        } // Backslash
+                        '\'' => {
+                            result.push(TokType::Literal(0x27));
+                        } // Apostrophe or single quotation mark
+                        '\"' => {
+                            result.push(TokType::Literal(0x22));
+                        } // Double quotation mark
+                        '?' => {
+                            result.push(TokType::Literal(0x3F));
+                        } // question mark
+                        _ => {
+                            return Err(format!("unrecongnized character"));
+                        }
                     }
                     it.next();
                     if it.peek().unwrap() != &'\'' {
                         return Err(format!("Error: unmatched '"));
                     }
                     it.next();
-                }
-                else {
+                } else {
                     result.push(TokType::Literal(c as i64));
                     it.next(); // skip char
                     it.next(); // skip '
                 }
-            },
+            }
             '0'...'9' => {
                 it.next();
                 let mut number = c

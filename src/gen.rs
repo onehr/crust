@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 use crate::lexer::TokType;
-use crate::parser::{NodeType, ParseNode, StmtType, DataType};
+use crate::parser::{DataType, NodeType, ParseNode, StmtType};
 use std::collections::{HashMap, HashSet};
 
 // generate a std::String contains the assembly language code
 static mut LABEL_COUNTER: i64 = -1;
-fn gen_labels(prefix: String) -> String {
+fn gen_labels(prefix: &str) -> String {
     unsafe {
         LABEL_COUNTER = LABEL_COUNTER + 1;
         return format!(".L{}{}", prefix, LABEL_COUNTER);
@@ -19,7 +19,7 @@ fn fn_main_has_ret() {
     }
 }
 
-fn gen_fn_prologue(fn_name: String) -> String {
+fn gen_fn_prologue(fn_name: &str) -> String {
     let p = "        ";
     format!(
         "{}.text\n\
@@ -177,7 +177,7 @@ pub fn gen_prog(tree: &ParseNode) -> String {
                     // just put them in .comm
                     // now we use value has 8 bytes by default.
                     // XXX: should be vary-length based on the data type.
-                    prog_body.push_str(&format!("{}.comm {}, 8, 8\n", p, var_name, ))
+                    prog_body.push_str(&format!("{}.comm {}, 8, 8\n", p, var_name,))
                 } else {
                     let val = compute_const(&it.child.get(0).unwrap());
                     prog_body.push_str(&format!(
@@ -216,7 +216,7 @@ pub fn gen_prog(tree: &ParseNode) -> String {
                             } else {
                                 // stored in regs, we use offset from 0-5 as index to regs.
                                 // and use (i+1)*-8 as their index, cause we will push them one by one at the new frame stack
-                                index_map.insert(var_list[i].to_string(), - (i as isize +1) * 8);
+                                index_map.insert(var_list[i].to_string(), -(i as isize + 1) * 8);
                             }
                         }
                     }
@@ -576,7 +576,7 @@ pub fn gen_block(
         // this is a function definition block
         // we need to store the input argument in the stack
         // first push them in stack
-        let regs : Vec<&'static str> = vec!["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
+        let regs: Vec<&'static str> = vec!["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
         if (current_scope.len() > 6) {
             for i in 0..6 {
                 stmts.push_str(&format!("{}pushq {}\n", p, regs[i]));
@@ -588,7 +588,6 @@ pub fn gen_block(
         }
         // XXX: cause right now the generated will use small amout of registers,
         // but in the future will need to save callee-saved registers in the function stack
-
     }
 
     for it in &tree.child {
@@ -667,15 +666,14 @@ pub fn gen_stmt(
 ) -> String {
     let p = "        ".to_string(); // 8 white spaces
     match &tree.entry {
-        NodeType::StringLiteral(data, tag) => {
-            format!(
-                "{}.section .rodata\n\
-                 {}:\n\
-                 {}.string \"{}\"\n\
-                 {}.text\n\
-                 {}leaq {}(%rip), %rax\n",p, tag,p, data, p, p, tag,
-            )
-        },
+        NodeType::StringLiteral(data, tag) => format!(
+            "{}.section .rodata\n\
+             {}:\n\
+             {}.string \"{}\"\n\
+             {}.text\n\
+             {}leaq {}(%rip), %rax\n",
+            p, tag, p, data, p, p, tag,
+        ),
         NodeType::ConditionalExp => {
             if tree.child.len() == 1 {
                 // just one <logical-or-exp>
@@ -757,7 +755,7 @@ pub fn gen_stmt(
             s.push_str(&format!("{}pushq %r10\n", p));
             s.push_str(&format!("{}pushq %r11\n", p));
             // mov argument into registers.
-            let regs : Vec<&'static str> = vec!["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
+            let regs: Vec<&'static str> = vec!["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
             for i in 0..tree.child.len() {
                 s.push_str(&gen_stmt(
                     tree.child.get(i).unwrap(),
@@ -774,7 +772,10 @@ pub fn gen_stmt(
                     s.push_str(&format!("{}pushq %rax\n", p));
                 } else {
                     // store into regs.
-                    s.push_str(&format!("{}movq %rax, {}\n{}movq $0, %rax\n", p, regs[i], p));
+                    s.push_str(&format!(
+                        "{}movq %rax, {}\n{}movq $0, %rax\n",
+                        p, regs[i], p
+                    ));
                 }
             }
             // for it in tree.child.iter().rev() {
@@ -800,7 +801,7 @@ pub fn gen_stmt(
                 s.push_str(&format!(
                     "{}addq ${}, %rsp # remove the arguments\n",
                     p,
-                    8 * (tree.child.len()-6)
+                    8 * (tree.child.len() - 6)
                 ));
             }
             s.push_str(&format!("{}popq %r11\n", p));
@@ -1019,15 +1020,9 @@ pub fn gen_stmt(
                  {}movq (%rbx, %rdx, 8), %rax\n\
                  {}popq %rbx\n\
                  {}popq %rdx\n",
-                get_index,
-                p,
-                p,
-                p,
-                p, var_name,
-                p,
-                p,p,
+                get_index, p, p, p, p, var_name, p, p, p,
             )
-        },
+        }
         NodeType::AssignNode(var_name, true) => {
             match index_map.get(var_name) {
                 None => {
@@ -1067,11 +1062,7 @@ pub fn gen_stmt(
                                  {}\
                                  {}movq {}@GOTPCREL(%rip), %rbx\n\
                                  {}movq %rax, (%rbx, %rdx, 8)\n",
-                                get_index,
-                                p,
-                                get_res,
-                                p, var_name,
-                                p,
+                                get_index, p, get_res, p, var_name, p,
                             )
                         }
                         false => {
