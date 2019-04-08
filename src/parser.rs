@@ -767,7 +767,7 @@ fn p_factor(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), S
             // println!("out p_factor with pos: {}", pos);
             return Ok((factor_node, pos));
         }
-        lexer::TokType::Minus | lexer::TokType::Tilde | lexer::TokType::Exclamation => {
+        lexer::TokType::Minus | lexer::TokType::Tilde | lexer::TokType::Exclamation | lexer::TokType::Addr => {
             // factor -> UnExp -> factor
             let mut factor_node = ParseNode::new();
             let mut unexp_node = ParseNode::new();
@@ -776,12 +776,12 @@ fn p_factor(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), S
                 lexer::TokType::Minus => lexer::TokType::Minus,
                 lexer::TokType::Tilde => lexer::TokType::Tilde,
                 lexer::TokType::Exclamation => lexer::TokType::Exclamation,
+                lexer::TokType::Addr => lexer::TokType::Addr,
                 _ => panic!("Something strange"),
             });
             let (next_factor_node, pos) = r#try!(p_factor(toks, pos));
             unexp_node.child.push(next_factor_node);
             factor_node.child.push(unexp_node);
-            // println!("out p_factor with pos: {}", pos);
             return Ok((factor_node, pos));
         }
         lexer::TokType::String(chars, tag) => {
@@ -1138,7 +1138,6 @@ fn p_additive_exp(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usi
         tok = &toks[pos];
     }
     exp_node.child.push(term_node);
-    // println!("2. out p_exp with pos: {}", pos);
     return Ok((exp_node, pos));
 }
 
@@ -1174,7 +1173,7 @@ pub fn parse_prog(input: &str, c_src_name: &str) -> Result<ParseNode, String> {
 pub fn print(tree: &ParseNode, idt: usize) -> String {
     let mut idt_prefix = String::new();
     for _i in 0..idt {
-        idt_prefix = idt_prefix + "    ";
+        idt_prefix = idt_prefix + " ";
     }
     match &tree.entry {
         NodeType::StringLiteral(data, tag) => format!(
@@ -1588,6 +1587,7 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
                 lexer::TokType::Minus => "-".to_string(),
                 lexer::TokType::Tilde => "~".to_string(),
                 lexer::TokType::Exclamation => "!".to_string(),
+                lexer::TokType::Addr => "&".to_string(),
                 _ => panic!("Operator for Unary Expression not supported"),
             },
             print(

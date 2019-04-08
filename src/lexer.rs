@@ -43,6 +43,7 @@ pub enum TokType {
     QuestionMark,       // ?
     Comma,              // ,
     String(String, String),
+    Addr,               // &var
 }
 
 static mut LABEL_COUNTER: i64 = -1;
@@ -304,7 +305,8 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                         }
                         _ => {
                             // now don't support bitwise and, so just return Err
-                            return Err(format!("unexpected token &{}", c));
+                            // & operator to get the address of a variable
+                            result.push(TokType::Addr);
                         }
                     },
                     _ => return Err(format!("Can not peek next char")),

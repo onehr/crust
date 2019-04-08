@@ -351,7 +351,7 @@ pub fn gen_declare(
             }
             let s = format!(
                 "{}\
-                 {}pushq %rax\n",
+                 {}pushq %rax # gen_declare\n",
                 e1, p
             );
             (index_map, scope, idx, s)
@@ -654,6 +654,53 @@ pub fn gen_block(
     )
 }
 
+// XXX: now can not handle global variable address.
+fn gen_addr(
+    tree: &ParseNode,
+    index_map: &HashMap<String, isize>,
+    global_variable_scope: &HashSet<String>
+) -> String {
+    let p = "        ".to_string();
+    // first judge whether it is a global variable or local variable
+    match &tree.entry {
+        NodeType::ArrayRef(name) => {
+            match index_map.get(name) {
+                Some(c) => {
+                    // local array
+                    panic!(format!("Error: address to local array not implemented"));
+                }
+                None => {
+                    // not local but should check in global variable scope
+                    panic!(format!("Error: address to global array not implmented"));
+                }
+            }
+        }
+        NodeType::Var(name) => {
+            match index_map.get(name) {
+                Some(c) => {
+                    // local variable
+                    format!("{}leaq {}(%rbp), %rax\n", p, c) // put address in rax
+                }
+                None => {
+                    // not local but should check in global
+                    if (global_variable_scope.contains(name)) {
+                        // ok
+                        format!("{}movq {}@GOTPCREL(%rip), %rax\n", p, name)
+                    } else {
+                        panic!(format!("Using address operator against an undeclared variable"));
+                    }
+                }
+            }
+        }
+        _ => {
+            if (tree.child.is_empty()) {
+                panic!(format!("Can not use address(&) operator to rhs({:?})", tree.entry));
+            } else {
+                gen_addr(tree.child.get(0).expect("In gen address no child node now"), index_map, global_variable_scope)
+            }
+        }
+    }
+}
 pub fn gen_stmt(
     tree: &ParseNode,
     index_map: &HashMap<String, isize>,
@@ -745,16 +792,41 @@ pub fn gen_stmt(
             //            rdi rsi rdx rcx r8  r9  stack
             // iter every expression in reverse direction
             // and then push them in stack
-            /*
-            if (tree.child.len() > 6) {
-                panic!("Error: crust now don't support function with arguments more than 6")
-            }*/
             let mut s: String = String::new();
+            /// should follow AMD System V ABI,
+            /// The begin of main function stack is aligned 8,
+            /// And end of the input argument area shall be aligned on a 16 (32, if __m256 is passed on stack) byte boundary.
+            /// so if we have n local variables, we pushed them into the stack.
+            /// and we need to store r10 and r11, and we should put argument with index bigger than 6 into stack
+            /// so the total element pushed into stack should be (n + 2 + (arg_list.len() - 6 > 0 ? arg_list.len() - 6 : 0))
+            /// if this value % 2 == 1, then we should push one element into stack.
+            /// Now I only handled this in main function, and I should also track the stack align for every function that we defined,
+            /// so we can make sure every function follows the ABI
 
-            // first save the caller saves regs: r10, r11
+            // first judge whether we need to push one extra element into stack
+            let tmp = match tree.child.len() {
+                0...6 => 0,
+                _ => tree.child.len() - 6,
+            };
+            if cfg!(feature="debug") {
+                println!("index_map.len() = {}", index_map.len());
+                println!("tmp = {}", tmp);
+            }
+            let extra: bool = match (index_map.len() + tmp + 2) % 2 {
+                0 => false,
+                _ => true,
+            };
+
+            if extra == true {
+                // then we need to add one element to stack to make sure follow the abi
+                s.push_str(&format!("{}pushq %rbx\n", p));
+            }
+
+            //then save the caller saves regs: r10, r11
             s.push_str(&format!("{}pushq %r10\n", p));
             s.push_str(&format!("{}pushq %r11\n", p));
-            // mov argument into registers.
+
+            // mov argument into registers or stack if it's 7th element or later argument
             let regs: Vec<&'static str> = vec!["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
             for i in 0..tree.child.len() {
                 s.push_str(&gen_stmt(
@@ -778,24 +850,8 @@ pub fn gen_stmt(
                     ));
                 }
             }
-            // for it in tree.child.iter().rev() {
-            //     // generate expression
-            //     s.push_str(&gen_stmt(
-            //         it,
-            //         index_map,
-            //         idx,
-            //         lbb,
-            //         leb,
-            //         loop_in_label,
-            //         loop_out_label,
-            //         &global_variable_scope,
-            //     ));
-            //     // pushq
-            //     s.push_str(&format!("{}pushq %rax\n", p));
-            // }
-
             // call the function
-            s.push_str(&format!("{}call {}\n", p, fn_name));
+            s.push_str(&format!("{}call {}@PLT\n", p, fn_name));
             // after the callee function returns, remove the arguments from stack
             if (tree.child.len() > 6) {
                 s.push_str(&format!(
@@ -806,6 +862,10 @@ pub fn gen_stmt(
             }
             s.push_str(&format!("{}popq %r11\n", p));
             s.push_str(&format!("{}popq %r10\n", p));
+
+            if extra == true {
+                s.push_str(&format!("{}popq %rbx\n", p));
+            }
             s
         }
         NodeType::Stmt(stmt) => match stmt {
@@ -1164,6 +1224,10 @@ pub fn gen_stmt(
             }
         }
         NodeType::UnExp(op) => match op {
+            TokType::Addr => format!(
+                // put address of the factor in %rax
+                "{}", gen_addr(tree.child.get(0).expect("Addressing node no child"), index_map, &global_variable_scope)
+            ),
             TokType::Minus => format!(
                 "{}\
                  {}neg %rax\n",
@@ -1213,8 +1277,6 @@ pub fn gen_stmt(
                 p,
                 p
             ),
-            TokType::Lt => format!("Error: `<` not implemented"),
-            TokType::Gt => format!("Error: `>` not implemented"),
             _ => panic!(format!(
                 "Unary Operator `{:?}` not implemented in gen::gen_unexp()\n",
                 op
