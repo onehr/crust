@@ -653,24 +653,61 @@ pub fn gen_block(
     )
 }
 
-// XXX: now can not handle global variable address.
 fn gen_addr(
     tree: &ParseNode,
     index_map: &HashMap<String, isize>,
-    global_variable_scope: &HashSet<String>
+    idx: isize,
+    lbb: &str, // label_begin_block
+    leb: &str, // label_end_block
+    loop_in_label: Option<&str>,
+    loop_out_label: Option<&str>,
+    global_variable_scope: &HashSet<String>,
 ) -> String {
     let p = "        ".to_string();
     // first judge whether it is a global variable or local variable
     match &tree.entry {
-        NodeType::ArrayRef(name) => {
-            match index_map.get(name) {
+        NodeType::ArrayRef(var_name) => {
+            match index_map.get(var_name) {
                 Some(c) => {
                     // local array
                     panic!(format!("Error: address to local array not implemented"));
                 }
                 None => {
                     // not local but should check in global variable scope
-                    panic!(format!("Error: address to global array not implmented"));
+                    match global_variable_scope.contains(var_name) {
+                        true => {
+                            // address of array[exp]
+                            // should generate exp -> rax
+                            let get_index = gen_stmt(
+                                tree.child
+                                    .get(0)
+                                    .expect("Statement::Declare Node has no child"),
+                                index_map,
+                                idx,
+                                lbb,
+                                leb,
+                                loop_in_label,
+                                loop_out_label,
+                                &global_variable_scope,
+                            );
+                            //                get index => rax
+                            //        leaq    0(,%rax,8), %rdx
+                            //        movq    a@GOTPCREL(%rip), %rax
+                            //        addq    %rdx, %rax
+                            format!(
+                                "{}\
+                                 {}pushq %rdx\n\
+                                 {}leaq  0(,%rax,8), %rdx\n\
+                                 {}movq {}@GOTPCREL(%rip), %rax\n\
+                                 {}addq %rdx, %rax\n\
+                                 {}popq %rdx\n",
+                                get_index, p, p, p, var_name,p, p,
+                            )
+                        }
+                        false => {
+                            panic!(format!("Error: Using address operator against an undeclared variable `{}`", var_name));
+                        }
+                    }
                 }
             }
         }
@@ -682,11 +719,11 @@ fn gen_addr(
                 }
                 None => {
                     // not local but should check in global
-                    if (global_variable_scope.contains(name)) {
+                    if global_variable_scope.contains(name) {
                         // ok
                         format!("{}movq {}@GOTPCREL(%rip), %rax\n", p, name)
                     } else {
-                        panic!(format!("Using address operator against an undeclared variable"));
+                        panic!(format!("Using address operator against an undeclared variable `{}`", name));
                     }
                 }
             }
@@ -695,7 +732,15 @@ fn gen_addr(
             if (tree.child.is_empty()) {
                 panic!(format!("Can not use address(&) operator to rhs({:?})", tree.entry));
             } else {
-                gen_addr(tree.child.get(0).expect("In gen address no child node now"), index_map, global_variable_scope)
+                gen_addr(
+                    tree.child.get(0).expect("In gen address no child node now"),
+                    index_map,
+                    idx,
+                    lbb,
+                    leb,
+                    loop_in_label,
+                    loop_out_label,
+                    global_variable_scope)
             }
         }
     }
@@ -818,7 +863,7 @@ pub fn gen_stmt(
 
             if extra == true {
                 // then we need to add one element to stack to make sure follow the abi
-                s.push_str(&format!("{}pushq %rbx\n", p));
+                s.push_str(&format!("{}pushq $0\n", p));
             }
 
             //then save the caller saves regs: r10, r11
@@ -863,7 +908,7 @@ pub fn gen_stmt(
             s.push_str(&format!("{}popq %r10\n", p));
 
             if extra == true {
-                s.push_str(&format!("{}popq %rbx\n", p));
+                s.push_str(&format!("{}addq $8, %rsp\n", p));
             }
             s
         }
@@ -1225,7 +1270,15 @@ pub fn gen_stmt(
         NodeType::UnExp(op) => match op {
             TokType::Addr => format!(
                 // put address of the factor in %rax
-                "{}", gen_addr(tree.child.get(0).expect("Addressing node no child"), index_map, &global_variable_scope)
+                "{}", gen_addr(
+                    tree.child.get(0).expect("Addressing node no child"),
+                    index_map,
+                    idx,
+                    lbb,
+                    leb,
+                    loop_in_label,
+                    loop_out_label,
+                    global_variable_scope)
             ),
             TokType::Minus => format!(
                 "{}\

@@ -1503,55 +1503,13 @@ pub fn print(tree: &ParseNode, idt: usize) -> String {
                 )
             }
         },
-        NodeType::LogicalOrExp => format!(
-            "{}n_type: LogicalOrExp, [\n{}\n{}]",
-            idt_prefix,
-            print(
-                tree.child
-                    .get(0)
-                    .expect("Logical_Or_Expression Node has no child"),
-                idt + 1
-            ),
-            idt_prefix
-        ),
-        NodeType::LogicalAndExp => format!(
-            "{}n_type: LogicalAndExp, [\n{}\n{}]",
-            idt_prefix,
-            print(
-                tree.child
-                    .get(0)
-                    .expect("Logical_And_Expression Node has no child"),
-                idt + 1
-            ),
-            idt_prefix
-        ),
-        NodeType::EqualityExp => format!(
-            "{}n_type: EqualityExp, [\n{}\n{}]",
-            idt_prefix,
-            print(
-                tree.child.get(0).expect("Expression Node has no child"),
-                idt + 1
-            ),
-            idt_prefix
-        ),
-        NodeType::RelationalExp => format!(
-            "{}n_type: RelationalExp, [\n{}\n{}]",
-            idt_prefix,
-            print(
-                tree.child.get(0).expect("Expression Node has no child"),
-                idt + 1
-            ),
-            idt_prefix
-        ),
-        NodeType::AdditiveExp => format!(
-            "{}n_type: AdditiveExp, [\n{}\n{}]",
-            idt_prefix,
-            print(
-                tree.child.get(0).expect("Expression Node has no child"),
-                idt + 1
-            ),
-            idt_prefix
-        ),
+        NodeType::LogicalOrExp |
+        NodeType::LogicalAndExp|
+        NodeType::EqualityExp  |
+        NodeType::RelationalExp|
+        NodeType::AdditiveExp =>
+            print(tree.child.get(0).expect(&format!("{:?} Node has no child", tree.entry)), idt),
+
         NodeType::ExpOption => match tree.child.len() {
             0 => format!("{}n_type: ExpOption", idt_prefix),
             1 => format!(
