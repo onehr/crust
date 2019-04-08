@@ -9,7 +9,7 @@ Support C11 Standard and generate X86_64 Assembly Code from C source code.
 
 This compiler is in a Beta state (started at Mar 30, 2019), using it to develop would be like using a stick to face a dragon.
 The plan is to developing it until it can compile real-world applications.
-At the moment the main focus is on how to use Rust and build the basic structures.
+At the moment the main focus is building the basic structures and adding more features to it.
 
 ## TODOLIST
 I will add project todo-list soon for better organization.
@@ -34,7 +34,7 @@ I will add project todo-list soon for better organization.
 17. Global variables.
 18. Global one-dimensional(1-D) Array
 19. `string` literals.
-20. `&` operator for variables.
+20. Addressing operator `&` for int variables or arrays.
 21. Follow System V ABI (working on, can call function like `printf` or `scanf` in your main function now).
 
 ## Requirements
@@ -58,7 +58,6 @@ If you want to run the program, you should type:
 ```bash
 $ gcc -o a.out output_file.s
 $ ./a.out
-$ echo $?
 ```
 
 Gcc is currently used as the back-end of the compiler to produce the binary from the output assembly file.
@@ -74,7 +73,7 @@ $ ./test.sh
 ```
 
 
-## Usage Example
+## Usage Examples
 Due to the Beta state the compiler only supports a few features.
 
 At the moment, `main` can not take any input arguments, but functions can be defined and called.
@@ -166,13 +165,24 @@ After sort:
 
 It works now!
 
-And here is one test example from file `test/valid/combine_4.c`.
+## Test Example
+
+Cause it's Beta-stage, this project uses a simple method to do the test.
+```
+Test Sequences:
+1. run crust compiler to compile [test/valid/*.c] into [gen/test/valid/*.s] (get the assembly file)
+2. run gcc compiler to assemble [gen/test/valid/*.s] into [gen/test/valid/*.crust] ( *.crust is executable file)
+3. run gcc compiler to compile [test/valid/*.c] into [gen/test/valid/*.gcc] ( *.gcc is executable file)
+4. compares the running results of the *.crust file and the *.gcc file
+```
+
+Here is one test example from file `test/valid/combine_4.c`.
 It defines a `fib` function and use it to calculate the 
 10th [fibonacci number](https://en.wikipedia.org/wiki/Fibonacci_number),
 then generate a fibonacci array,
 and use [bubble sort](https://www.wikiwand.com/en/Bubble_sort) algorithm 
 to sort an descend array `[99, 98, 97, ..., 1, 0]` to get an ascend array `[0, 1, ..., 98, 99]`, 
-and also demonstrates a few other basic math functions.
+and also defines a few other basic math functions.
 
 ```c
 int fib(int a) {if (a == 0 || a == 1) {return a;} else {return fib(a - 1) + fib(a - 2);}}
@@ -240,7 +250,7 @@ int main() {
         return arr[len-1];
 }
 ```
-This is actually an unit test, it can test every function works correctly,
+This file can test every function works correctly,
 if everything goes fine, this program should retrun `arr[99]` which should be 99, 
 if there's something wrong, it will return 1,
 which is `EXIT_FAILURE`.
@@ -248,6 +258,7 @@ which is `EXIT_FAILURE`.
 If we use the `crust` compiler to compile this program and run the final executable file,
 the program will return 99, which is correct.
 
+## Generated File
 The generated code would be some thing like this (The assmebly file contains too many lines, so I just paste a snippet of it)
 
 ```assembly
@@ -463,6 +474,16 @@ min:
         .section	.note.GNU-stack,"",@progbits
 ```
 
+## Structures
+Now, only four basic parts:
+1. `main driver`
+2. `lexer`
+3. `parser`
+4. `generator` 
+
+Will add more layers in the future, like `semantics analyzer`, `IR generator`, simple `Optimizer` and `instruction generator`.
+
 ## Contact
 If you are interested in this project, or have troubles with it, feel free to contact me at 
-waharaxn@gmail.com, with a subject line containing [Crust-dev].
+waharaxn@gmail.com, with a subject line containing [Crust-dev], or you can join the gitter chat room.
+[![Gitter](https://badges.gitter.im/crust-dev/community.svg)](https://gitter.im/crust-dev/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
