@@ -12,15 +12,8 @@ fn main() -> Result<(), String> {
 
         opts::Opts::from_args()
     };
-    let args: Vec<String> = env::args().collect();
 
-    // first check the length of args is 3.
-    // format: crust source.c output.s
-    // TODO: need to add more options later
-    if args.len() != 3 {
-        print_usage();
-        return Ok(());
-    }
+    let args: Vec<String> = env::args().collect();
 
     let c_src_name = &args[1];
     let s_src_name = &args[2];
