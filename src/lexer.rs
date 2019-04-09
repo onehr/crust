@@ -63,7 +63,8 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
             '"' => {
                 it.next();
                 let mut s = "".to_string();
-                while let &c = it.peek().unwrap() {
+                loop {
+                    let &c = it.peek().unwrap();
                     if c == '"' {
                         break;
                     }
