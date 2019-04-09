@@ -1,11 +1,17 @@
 mod gen;
 mod lexer;
+mod opts;
 mod parser;
 
 use std::env;
 use std::fs;
 
 fn main() -> Result<(), String> {
+    let opts: opts::Opts = {
+        use structopt::StructOpt;
+
+        opts::Opts::from_args()
+    };
     let args: Vec<String> = env::args().collect();
 
     // first check the length of args is 3.
