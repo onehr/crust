@@ -172,7 +172,7 @@ pub fn gen_prog(tree: &ParseNode) -> String {
             NodeType::Declare(var_name, DataType::I64) => {
                 // record it in the scope, index_map,
                 global_variable_scope.insert(var_name.to_string());
-                if (it.child.is_empty()) {
+                if it.child.is_empty() {
                     // uninitialized global variable
                     // just put them in .comm
                     // now we use value has 8 bytes by default.
@@ -432,7 +432,7 @@ pub fn gen_for(
             //let b_deallocate = 8 * scope.len();
             let mut b_deallocate = 0;
             for (_, val) in scope.iter() {
-                if (*val == false) {
+                if *val == false {
                     b_deallocate += 8;
                 }
             }
@@ -516,7 +516,7 @@ pub fn gen_for(
             // let b_deallocate = 8 * scope.len();
             let mut b_deallocate = 0;
             for (_, val) in scope.iter() {
-                if (*val == false) {
+                if *val == false {
                     b_deallocate += 8;
                 }
             }
@@ -576,7 +576,7 @@ pub fn gen_block(
         // we need to store the input argument in the stack
         // first push them in stack
         let regs: Vec<&'static str> = vec!["%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"];
-        if (current_scope.len() > 6) {
+        if current_scope.len() > 6 {
             for i in 0..6 {
                 stmts.push_str(&format!("{}pushq {}\n", p, regs[i]));
             }
@@ -729,7 +729,7 @@ fn gen_addr(
             }
         }
         _ => {
-            if (tree.child.is_empty()) {
+            if tree.child.is_empty() {
                 panic!(format!("Can not use address(&) operator to rhs({:?})", tree.entry));
             } else {
                 gen_addr(
@@ -837,15 +837,15 @@ pub fn gen_stmt(
             // iter every expression in reverse direction
             // and then push them in stack
             let mut s: String = String::new();
-            /// should follow AMD System V ABI,
-            /// The begin of main function stack is aligned 8,
-            /// And end of the input argument area shall be aligned on a 16 (32, if __m256 is passed on stack) byte boundary.
-            /// so if we have n local variables, we pushed them into the stack.
-            /// and we need to store r10 and r11, and we should put argument with index bigger than 6 into stack
-            /// so the total element pushed into stack should be (n + 2 + (arg_list.len() - 6 > 0 ? arg_list.len() - 6 : 0))
-            /// if this value % 2 == 1, then we should push one element into stack.
-            /// Now I only handled this in main function, and I should also track the stack align for every function that we defined,
-            /// so we can make sure every function follows the ABI
+            // should follow AMD System V ABI,
+            // The begin of main function stack is aligned 8,
+            // And end of the input argument area shall be aligned on a 16 (32, if __m256 is passed on stack) byte boundary.
+            // so if we have n local variables, we pushed them into the stack.
+            // and we need to store r10 and r11, and we should put argument with index bigger than 6 into stack
+            // so the total element pushed into stack should be (n + 2 + (arg_list.len() - 6 > 0 ? arg_list.len() - 6 : 0))
+            // if this value % 2 == 1, then we should push one element into stack.
+            // Now I only handled this in main function, and I should also track the stack align for every function that we defined,
+            // so we can make sure every function follows the ABI
 
             // first judge whether we need to push one extra element into stack
             let tmp = match tree.child.len() {
@@ -883,7 +883,7 @@ pub fn gen_stmt(
                     loop_out_label,
                     &global_variable_scope,
                 ));
-                if (i >= 6) {
+                if i >= 6 {
                     // store in stack
                     s.push_str(&format!("{}pushq %rax\n", p));
                 } else {
@@ -897,7 +897,7 @@ pub fn gen_stmt(
             // call the function
             s.push_str(&format!("{}call {}@PLT\n", p, fn_name));
             // after the callee function returns, remove the arguments from stack
-            if (tree.child.len() > 6) {
+            if tree.child.len() > 6 {
                 s.push_str(&format!(
                     "{}addq ${}, %rsp # remove the arguments\n",
                     p,
