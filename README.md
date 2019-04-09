@@ -2,14 +2,20 @@
 [![Build Status](https://travis-ci.com/onehr/crust.svg?branch=master)](https://travis-ci.com/onehr/crust)
 [![Gitter](https://badges.gitter.im/crust-dev/community.svg)](https://gitter.im/crust-dev/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
-A simple C compiler written in the Rust-lang.
+A simple C compiler written in the Rust-lang. (early development stage, started at Mar 30, 2019)
 
 ## Project Goal
-Support C11 Standard and generate X86_64 Assembly Code from C source code.
+Should follow the C11 Standard and generate X86-64 Assembly Code from C source code.
 
-This compiler is in a Beta state (started at Mar 30, 2019), using it to develop would be like using a stick to face a dragon.
-The plan is to developing it until it can compile real-world applications.
-At the moment the main focus is building the basic structures and adding more features to it.
+This compiler is in a Beta state, using it to develop would be like using a stick to face a dragon.
+The plan is to developing it until it can compile real-world applications to achieve milestone version 0.1.
+At the moment the main focus is building the basic layers and adding more features to it.
+
+## Milestone 0.1 Goal
+1. Finish the preprocessor.
+2. Support all C11 grammar rules.
+3. replace gcc with it's own assembler to generate binary code
+4. Stabilize the interfaces among different layers.
 
 ## TODOLIST
 I will add project todo-list soon for better organization.
