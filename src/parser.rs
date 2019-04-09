@@ -93,7 +93,7 @@ fn p_logical_or_exp(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
         return Ok((log_or_exp_node, pos));
     }
 
-    /// log_or_exp -> BinExp -> (left: logAndExp, right logAndExp)
+    // log_or_exp -> BinExp -> (left: logAndExp, right logAndExp)
     let mut lhs = log_and_exp_node;
     while *tok == lexer::TokType::Or {
         let mut binexp_node = ParseNode::new();
@@ -275,7 +275,7 @@ fn p_fn(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), Strin
                 pos = pos + 1;
             }
             lexer::TokType::Kwd(lexer::KwdType::Void) => {
-                if (arg_count > 0) {
+                if arg_count > 0 {
                     return Err(format!(
                         "Error: void after other argument in one function definition"
                     ));
@@ -750,7 +750,7 @@ fn p_factor(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), S
     match next {
         lexer::TokType::LParen => {
             // parse expression inside parens
-            /// factor -> exp
+            // factor -> exp
             let (exp_node, tmp_pos) = r#try!(p_exp(toks, pos));
             pos = tmp_pos;
             next = &toks[pos];
@@ -1066,7 +1066,7 @@ fn p_term(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), Str
     let mut term_node = ParseNode::new();
     term_node.entry = NodeType::Term;
 
-    /// term -> factor
+    // term -> factor
     let mut pos = pos;
     let (factor_node, tmp_pos) = r#try!(p_factor(toks, pos));
     pos = tmp_pos;
@@ -1079,7 +1079,7 @@ fn p_term(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), Str
         return Ok((term_node, pos));
     }
 
-    /// term -> BinExp -> (factor_left, factor_right)
+    // term -> BinExp -> (factor_left, factor_right)
     let mut factor_node = factor_node;
     while *tok == lexer::TokType::Multi || *tok == lexer::TokType::Splash {
         let mut binexp_node = ParseNode::new();
@@ -1108,7 +1108,7 @@ fn p_additive_exp(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usi
     // println!("in p_exp with pos: {}", pos);
     let mut exp_node = ParseNode::new();
     exp_node.entry = NodeType::AdditiveExp;
-    /// exp -> term
+    // exp -> term
     let mut pos = pos;
     let (term_node, tmp_pos) = r#try!(p_term(toks, pos));
     pos = tmp_pos;
@@ -1118,7 +1118,7 @@ fn p_additive_exp(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usi
         // println!("1.out p_exp with pos: {}", pos);
         return Ok((exp_node, pos));
     }
-    /// exp -> BinExp()
+    // exp -> BinExp()
     //peek next token, if it is lexer::TokType::Plus or lexer::TokType::Minus
     let mut term_node = term_node;
     let mut pos = pos;

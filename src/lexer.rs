@@ -64,7 +64,7 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                 it.next();
                 let mut s = "".to_string();
                 while let &c = it.peek().unwrap() {
-                    if (c == '"') {
+                    if c == '"' {
                         break;
                     }
                     s.push(c);
@@ -79,10 +79,10 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                 // transform it to int
                 it.next(); // skip '
                 let &c = it.peek().unwrap();
-                if (c == '\'') {
+                if c == '\'' {
                     return Err(format!("Error: empty character constant"));
                 }
-                if (c == '\\') {
+                if c == '\\' {
                     it.next();
                     let &c = it.peek().unwrap();
                     match c {
