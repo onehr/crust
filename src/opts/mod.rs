@@ -6,12 +6,12 @@ mod arg_groups;
 pub struct Opts {
     #[structopt(flatten)]
     stop_stage: StopStage,
-    /// The language.
-    #[structopt(group = "OutputOptions", short = "-x")]
-    language: String,
     /// The output file.
     #[structopt(short = "-o", parse(from_os_str))]
     output: path::PathBuf,
+    /// The input file(s).
+    #[structopt(parse(from_os_str))]
+    input: Vec<path::PathBuf>,
 }
 
 #[derive(structopt::StructOpt, Clone, Debug)]
