@@ -10,7 +10,7 @@ Should follow the C11 Standard and generate x86-64 Assembly Code from C source c
 This compiler is in the Alpha stage, the plan is to developing it until it can compile real-world applications.
 At the moment the main focuses are improving the lexer and parser, building the basic IR layer, and improving the generator to achieve milestone 0.1. It was not easy, but I hope it can be accomplished in several months.
 
-If you got interest in this project and want to build a functional c compiler from scratch, feel free to join the gitter chat room, we have already got some contributors now who are interested in building this project. I think it would be fun to start a big project from scratch, cause there are so many interesting things waiting to be finished.
+If you are interested in `crust` and want to contribute, feel free to join the Gitter chat room, we have already got some contributors now who are interested in building this project.
 
 ## Milestone 0.1 Goal
 1. Finish the preprocessor.
