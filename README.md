@@ -5,23 +5,24 @@
 A simple C compiler written in the Rust-lang. (early development stage, started at Mar 30, 2019)
 
 ## Project Goal
-Should follow the C11 Standard and generate X86-64 Assembly Code from C source code.
+Should follow the C11 Standard and generate x86-64 Assembly Code from C source code.
 
-This compiler is in a Beta state, using it to develop would be like using a stick to face a dragon.
-The plan is to developing it until it can compile real-world applications to achieve milestone version 0.1.
-At the moment the main focus is building the basic layers and adding more features to it.
+This compiler is in the Alpha stage, the plan is to developing it until it can compile real-world applications.
+At the moment the main focuses are improving the lexer and parser, building the basic IR layer, and improving the generator to achieve milestone 0.1. It was not easy, but I hope it can be accomplished in several months.
+
+If you are interested in `crust` and want to contribute, feel free to join the Gitter chat room, we have already got some contributors now who are interested in building this project.
 
 ## Milestone 0.1 Goal
 1. Finish the preprocessor.
 2. Support all C11 grammar rules.
 3. replace gcc with it's own assembler to generate binary code
 4. Stabilize the interfaces among different layers.
+5. With some possible optimizations.
 
-## TODOLIST
-I will add project todo-list soon for better organization.
 
 ## Currently Supports
-**Because of the Beta nature, crust supports few C features**.
+**Because of the Alpha nature, crust supports few C features**.
+
 1. Local Variables, declaration and assignment.
 2. The `return` statement.
 3. Unary Operators: `!`, `~`, `-`(Negation).
@@ -488,8 +489,3 @@ Now, only four basic parts:
 4. `generator` 
 
 Will add more layers in the future, like `semantics analyzer`, `IR generator`, simple `Optimizer` and `instruction generator`.
-
-## Contact
-If you are interested in this project, or have troubles with it, feel free to contact me at 
-waharaxn@gmail.com, with a subject line containing [Crust-dev], or you can join the gitter chat room.
-[![Gitter](https://badges.gitter.im/crust-dev/community.svg)](https://gitter.im/crust-dev/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
