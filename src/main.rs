@@ -3,18 +3,28 @@ mod lexer;
 mod opts;
 mod parser;
 
-use std::env;
-use std::fs;
+use std::{env, error, fs};
 
-fn main() -> Result<(), String> {
+fn main() -> Result<(), Box<dyn error::Error>> {
     let opts: opts::Opts = {
         use structopt::StructOpt;
 
         opts::Opts::from_args()
     };
 
-    let args: Vec<String> = env::args().collect();
+    // TODO: allow support for multiple input files.
+    //       Currently it tries to get the first input file and thats all
+    let input_file = opts.input()[0].clone();
 
+    let input_file_contents = fs::read_to_string(input_file.clone())?;
+    let tokens = lexer::lex(&input_file_contents)?;
+    let root_node = parser::parse_prog(&input_file_contents, &input_file.display().to_string())?;
+    let output_file_contents = gen::gen_prog(&root_node);
+
+    fs::write(opts.output(), output_file_contents)?;
+    Ok(())
+    /*
+    let args: Vec<String> = env::args().collect();
     let c_src_name = &args[1];
     let s_src_name = &args[2];
     let contents = fs::read_to_string(c_src_name).expect("Can't read file");
@@ -42,7 +52,7 @@ fn main() -> Result<(), String> {
     }
 
     fs::write(s_src_name, s_contents).expect("Can't write assembly code");
-    Ok(())
+    */
 }
 
 fn print_usage() {

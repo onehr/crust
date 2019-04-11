@@ -10,7 +10,7 @@ pub struct Opts {
     #[structopt(short = "-o", parse(from_os_str))]
     output: path::PathBuf,
     /// The input file(s).
-    #[structopt(parse(from_os_str))]
+    #[structopt(parse(from_os_str), required = true)]
     input: Vec<path::PathBuf>,
 }
 
@@ -19,13 +19,13 @@ pub struct Opts {
 pub struct StopStage {
     /// Stop after the assembly stage.
     #[structopt(group = "stop_stage_conflict_resolver", short = "-c")]
-    assemble_only: bool,
+    assemble: bool,
     /// Stop after the compilation stage.
     #[structopt(group = "stop_stage_conflict_resolver", short = "-S")]
-    compile_only: bool,
+    compile: bool,
     /// Stop after the preprocessing stage.
     #[structopt(group = "stop_stage_conflict_resolver", short = "-E")]
-    preprocess_only: bool,
+    preprocess: bool,
 }
 
 impl Opts {
@@ -43,15 +43,15 @@ impl Opts {
 }
 
 impl StopStage {
-    pub fn assemble_only(&self) -> bool {
-        self.assemble_only
+    pub fn assemble(&self) -> bool {
+        self.assemble
     }
 
-    pub fn compile_only(&self) -> bool {
-        self.compile_only
+    pub fn compile(&self) -> bool {
+        self.compile
     }
 
-    pub fn preprocess_only(&self) -> bool {
-        self.preprocess_only
+    pub fn preprocess(&self) -> bool {
+        self.preprocess
     }
 }
