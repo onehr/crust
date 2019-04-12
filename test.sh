@@ -25,8 +25,9 @@ test_fun() {
 }
 
 crust_compile() {
-    echo "crust compile $1.c -> $2.s" && ./target/debug/crust $1.c $2.s
+    echo "crust compile $1.c -> $2.s" && ./target/debug/crust -o $2.s $1.c
 }
+
 gcc_compile() {
     echo "gcc compile $2.s -> $2.crust"
     gcc -o $2.crust $2.s

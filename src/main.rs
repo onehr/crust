@@ -1,54 +1,48 @@
 mod gen;
 mod lexer;
+mod opts;
 mod parser;
 
-use std::env;
-use std::fs;
+use std::{error, fs};
 
-fn main() -> Result<(), String> {
-    let args: Vec<String> = env::args().collect();
+fn main() -> Result<(), Box<dyn error::Error>> {
+    let opts: opts::Opts = {
+        use structopt::StructOpt;
 
-    // first check the length of args is 3.
-    // format: crust source.c output.s
-    // TODO: need to add more options later
-    if args.len() != 3 {
-        print_usage();
-        return Ok(());
+        opts::Opts::from_args()
+    };
+
+    // TODO: allow support for multiple input files.
+    //       Currently it tries to get the first input file and thats all
+    let input_file = opts.input()[0].clone();
+
+    if opts.crust_debug_flags().print_filenames() {
+        println!("Source file: {}\n", input_file.display())
     }
 
-    let c_src_name = &args[1];
-    let s_src_name = &args[2];
-    let contents = fs::read_to_string(c_src_name).expect("Can't read file");
-    if cfg!(feature = "source") {
-        println!("--------------------------------");
-        println!("SOURCE_FILE: [{}]", c_src_name);
-        println!("--------------------------------");
-        println!("{}", contents);
+    let input_file_contents = fs::read_to_string(input_file.clone())?;
+
+    if opts.crust_debug_flags().print_file_contents() {
+        println!("File contents:\n{}\n", input_file_contents)
     }
 
-    let token_list = r#try!(lexer::lex(&contents));
-    if cfg!(feature = "token") {
-        println!("tokens: {:?}\n", token_list);
-        println!("number of tokens: {}", token_list.len());
+    let tokens = lexer::lex(&input_file_contents)?;
+    let root_node = parser::parse_prog(&input_file_contents, &input_file.display().to_string())?;
+
+    if opts.crust_debug_flags().print_source_ast() {
+        println!("Source AST:\n{}\n", parser::print(&root_node, 0))
     }
 
-    let root_node = r#try!(parser::parse_prog(&contents, c_src_name));
-    if cfg!(feature = "ast") {
-        println!("\nAST nodes:\n{}\n", parser::print(&root_node, 0));
+    if opts.crust_debug_flags().print_filenames() {
+        println!("Output file: {}\n", opts.output().display());
     }
 
-    let s_contents = gen::gen_prog(&root_node);
-    if cfg!(feature = "as") {
-        println!("\nAS FILE:\n{}", s_contents);
+    let output_file_contents = gen::gen_prog(&root_node);
+
+    if opts.crust_debug_flags().print_file_contents() {
+        println!("File contents:\n{}\n", output_file_contents)
     }
 
-    fs::write(s_src_name, s_contents).expect("Can't write assembly code");
+    fs::write(opts.output(), output_file_contents)?;
     Ok(())
-}
-
-fn print_usage() {
-    println!("--------------------------------");
-    println!("Copyright (c) 2019, Haoran Wang");
-    println!("--------------------------------");
-    println!("Usage: crust src_file[.c] out_file[.s]\n");
 }

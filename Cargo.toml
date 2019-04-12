@@ -4,7 +4,8 @@ version = "0.1.0"
 authors = ["onehrxn <waharaxn@gmail.com>"]
 edition = "2018"
 
-[dependencies]
+[dependencies.structopt]
+version = "0.2.15"
 
 [features]
 debug = []
