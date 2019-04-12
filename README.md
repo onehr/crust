@@ -56,7 +56,7 @@ $ cargo build # use this command to build the project
 You can run with
 
 ```bash
-$ cargo run -- -o source_file.s output_file.c # compile source_file.c => output_file.s
+$ cargo run -- -o output_file.s source_file.c # compile source_file.c => output_file.s
 ```
 
 You can get [output_file] as an assembly code file, which can be assembled into an ELF executable file.
