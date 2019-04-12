@@ -56,7 +56,7 @@ $ cargo build # use this command to build the project
 You can run with
 
 ```bash
-$ cargo run source_file.c output_file.s # compile source_file.c => output_file.s
+$ cargo run -- -o source_file.s output_file.c # compile source_file.c => output_file.s
 ```
 
 You can get [output_file] as an assembly code file, which can be assembled into an ELF executable file.
@@ -98,7 +98,7 @@ int main(void) {
 
 You can try command after you have build the crust compiler:
 ```bash
-$ ./target/debug/crust sample_code/hello_crust.c hello_crust.s
+$ ./target/debug/crust -o hello_crust.s sample_code/hello_crust.c
 $ gcc hello_crust.s -o a.out
 $ ./a.out
 ```
@@ -146,7 +146,7 @@ int main(void) {
 ```
 Run:
 ```bash
-$ ./target/debug/crust sample_code/input_data_sort.c input_data_sort.s
+$ ./target/debug/crust -o input_date_sort.s sample_code/input_data_sort.c
 $ gcc input_data_sort.s -o a.out
 $ ./a.out
 ```
