@@ -27,6 +27,7 @@ matrix:
             - g++-7
       env:
         - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
+        - CODECOV_TOKEN="bb6e7dd5-3c57-435d-9e8f-6e5d5744c1e4"
 
 script:
   - eval "${MATRIX_EVAL}"
@@ -45,7 +46,6 @@ addons:
       - binutils-dev
       - libiberty-dev
 
-CODECOV_TOKEN="bb6e7dd5-3c57-435d-9e8f-6e5d5744c1e4"
 
 after_success: |
   wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
