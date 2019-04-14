@@ -27,6 +27,9 @@ pub struct CrustDebugFlags {
     /// Print the source file ast.
     #[structopt(long = "--crust-print-source-ast")]
     print_source_ast: bool,
+    /// Print the source file token.
+    #[structopt(long = "--crust-print-source-token")]
+    print_source_token: bool,
 }
 
 #[derive(structopt::StructOpt, Clone, Copy, Debug)]
@@ -73,6 +76,8 @@ impl CrustDebugFlags {
     pub fn print_source_ast(&self) -> bool {
         self.print_source_ast
     }
+
+    pub fn print_source_token(&self) -> bool { self.print_source_token }
 }
 
 impl StopStage {
