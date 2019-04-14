@@ -4,6 +4,8 @@
 
 A simple C compiler written in the Rust-lang. (early development stage, started at Mar 30, 2019)
 
+(**PS. Now the master branch was paused, cause I was trying to achieve the milestone 0.1 in branch [dev](https://github.com/onehr/crust/tree/dev) and when it was finished, it will be merged back to branch master, now I just leave branch master as a simple toy.**)
+
 ## Project Goal
 Should follow the C11 Standard and generate x86-64 Assembly Code from C source code.
 
