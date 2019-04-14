@@ -1,10 +1,11 @@
 #!/bin/bash
 # build the project
-cargo build
-rm -r gen/
-mkdir -p gen/test/valid
 
-# now just test whether the number returned was right
+## PS. Now this test do not generate any file.
+## keep the -o file_name just for satisfy the command line option requirement
+
+cargo build
+
 RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m'
@@ -45,6 +46,8 @@ do
         echo -e "[${BLUE}parse ok${NC}]"
     fi
 done
+
+# should cause error in parser
 srcdir=test/invalid
 for f in $srcdir/*.c
 do
@@ -52,6 +55,21 @@ do
     file=${f%.*}
     crust_compile $file ./gen/$file
     if [ "$?" -ne 1 ]; then
+        echo -e "[${RED}Error${NC}]"
+        exit 1
+    else
+        echo -e "[${BLUE}parse ok${NC}]"
+    fi
+done
+
+# should cause no error
+srcdir=test/valid/parser
+for f in $srcdir/*.c
+do
+    inc=$(($inc+1))
+    file=${f%.*}
+    crust_compile $file ./gen/$file
+    if [ "$?" -ne 0 ]; then
         echo -e "[${RED}Error${NC}]"
         exit 1
     else
