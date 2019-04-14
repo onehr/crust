@@ -32,7 +32,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let root_node = parser::parser_driver(&input_file_contents, &input_file.display().to_string())?;
 
     if opts.crust_debug_flags().print_source_ast() {
-        println!("Source AST:\n{}\n", parser::parser_pretty_printer(&root_node, 0))
+        println!(
+            "Source AST:\n{}\n",
+            parser::parser_pretty_printer(&root_node, 0)
+        )
     }
 
     if opts.crust_debug_flags().print_filenames() {

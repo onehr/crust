@@ -34,33 +34,33 @@ pub enum TokType {
     IConstant(i64),
     FConstant(f64),
     StringLiteral(String, String),
-    FuncName, // __func__
-    SIZEOF, // sizeof
-    PtrOp, // ->
-    IncOp, // ++
-    DecOp, // --
-    LeftOp, // <<
-    RightOp, // >>
-    LeOp, // <=
-    GeOp, // >=
-    EqOp, // ==
-    NeOp, // !=
-    AndOp, // &&
-    OrOp, // ||
-    MulAssign, // *=
-    DivAssign, // /=
-    ModAssign, // %=
-    AddAssign, // +=
-    SubAssign, // -=
-    LeftAssign, // <<=
+    FuncName,    // __func__
+    SIZEOF,      // sizeof
+    PtrOp,       // ->
+    IncOp,       // ++
+    DecOp,       // --
+    LeftOp,      // <<
+    RightOp,     // >>
+    LeOp,        // <=
+    GeOp,        // >=
+    EqOp,        // ==
+    NeOp,        // !=
+    AndOp,       // &&
+    OrOp,        // ||
+    MulAssign,   // *=
+    DivAssign,   // /=
+    ModAssign,   // %=
+    AddAssign,   // +=
+    SubAssign,   // -=
+    LeftAssign,  // <<=
     RightAssign, // >>=
-    AndAssign, // &=
-    XorAssign, // ^=
-    OrAssign, // |=
+    AndAssign,   // &=
+    XorAssign,   // ^=
+    OrAssign,    // |=
     // TODO: this should be done when we found this is a typedef name,
     //       typedef LL int, then LL is typedef_name
     TypedefName,
-    ELLIPSIS, // ...
+    ELLIPSIS,                    // ...
     EnumerationConstant(String), // TODO: add check
     TYPEDEF,
     EXTERN,
@@ -342,7 +342,7 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                                         result.push(TokType::LeftOp);
                                         it.next();
                                     }
-                                }
+                                },
                                 _ => {
                                     result.push(TokType::LeftOp);
                                 }
@@ -352,7 +352,7 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                             result.push(TokType::Lt);
                         }
                     },
-                    _ =>  {
+                    _ => {
                         result.push(TokType::Lt);
                     }
                 }
@@ -376,7 +376,7 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                                     _ => {
                                         result.push(TokType::RightOp);
                                     }
-                                }
+                                },
                                 _ => {
                                     result.push(TokType::RightOp);
                                 }
@@ -557,7 +557,7 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                         _ => {
                             result.push(TokType::ExclusiveOr);
                         }
-                    }
+                    },
                     _ => {
                         result.push(TokType::ExclusiveOr);
                     }

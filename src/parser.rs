@@ -1,5 +1,5 @@
-use crate::lexer;
 use crate::ast::{ConstantType, NodeType, ParseNode};
+use crate::lexer;
 
 // parser: try to support all c11 features, v0.1 by Haoran Wang
 // XXX: How to handle error message properly should be improved later
@@ -14,11 +14,7 @@ fn error_handler(expect: &str, toks: &lexer::TokType, pos: usize) -> String {
     return format!("Expected `{}`, found {:?} at {}", expect, toks, pos);
 }
 
-fn check_tok(
-    pos: usize,
-    toks: &[lexer::TokType],
-    expect: &lexer::TokType,
-) -> Result<(), String> {
+fn check_tok(pos: usize, toks: &[lexer::TokType], expect: &lexer::TokType) -> Result<(), String> {
     check_pos(pos, toks.len())?;
 
     if &toks[pos] != expect {
@@ -1589,9 +1585,7 @@ fn p_enum_specifier(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
 
                     if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::Comma) {
                         let pos = pos + 1;
-                        if let Ok(_) =
-                            check_tok(pos, &toks, &lexer::TokType::RBrace)
-                        {
+                        if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::RBrace) {
                             let pos = pos + 1;
                             return Ok((cur_node, pos));
                         } else {
@@ -2743,8 +2737,7 @@ fn p_jump_statement(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
             }
         }
         lexer::TokType::CONTINUE => {
-            let cur_node =
-                ParseNode::new(NodeType::JumpStatement("continue".to_string(), None));
+            let cur_node = ParseNode::new(NodeType::JumpStatement("continue".to_string(), None));
             let pos = pos + 1;
             check_tok(pos, &toks, &lexer::TokType::Semicolon)?;
             let pos = pos + 1;
@@ -2764,7 +2757,8 @@ fn p_jump_statement(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
                 let pos = pos + 1;
                 return Ok((cur_node, pos));
             } else {
-                let mut cur_node = ParseNode::new(NodeType::JumpStatement("return".to_string(), None));
+                let mut cur_node =
+                    ParseNode::new(NodeType::JumpStatement("return".to_string(), None));
                 let (child_node, pos) = p_expression(toks, pos)?;
                 cur_node.child.push(child_node);
                 let pos = pos + 1;
@@ -2871,9 +2865,12 @@ pub fn parser_driver(input: &str, c_src_name: &str) -> Result<ParseNode, String>
 
     let (cur_node, pos) = p_translation_unit(&toks, 0)?;
     if pos == toks.len() {
-        return Ok(cur_node)
+        return Ok(cur_node);
     } else {
-        Err(format!("Parser drive fails to parse the file {}", c_src_name))
+        Err(format!(
+            "Parser drive fails to parse the file {}",
+            c_src_name
+        ))
     }
 }
 
@@ -2883,61 +2880,72 @@ pub fn parser_pretty_printer(tree: &ParseNode, depth: usize) -> String {
         idt = idt + "-";
     }
     let idt = idt;
-    let title : String = match &tree.entry {
-        NodeType::BinaryExpression(op) =>
-            format!("\n{}type: {:?}, op: {:?} :", idt, tree.entry, op),
-        NodeType::Constant(t) =>
-            format!("\n{}type: {:?}, type: {:?} :", idt, tree.entry, t),
-        NodeType::EnumerationConstant(s) =>
-            format!("\n{}type: {:?}, name: {:?}", idt, tree.entry, s),
-        NodeType::Identifier(name) =>
-            format!("\n{}type: {:?}, name: {:?}", idt, tree.entry, name),
-        NodeType::STRING(val) =>
-            format!("\n{}type: {:?}, val: {}", idt, tree.entry, val),
-        NodeType::PostfixExpressionPost(punc) =>
-            format!("\n{}type: {:?}, punc: {:?}", idt, tree.entry, punc),
-        NodeType::UnaryExpression(op) =>
-            format!("\n{}type: {:?}, op: {:?} :", idt, tree.entry, op),
-        NodeType::UnaryOperator(op) =>
-            format!("\n{}type: {:?}, op: {:?} :", idt, tree.entry, op),
-        NodeType::AssignmentOperator(op) =>
-            format!("\n{}type: {:?}, op: {:?} :", idt, tree.entry, op),
-        NodeType::StorageClassSpecifier(class) =>
-            format!("\n{}type: {:?}, class: {:?} :", idt, tree.entry, class),
-        NodeType::TypeSpecifier(t) =>
-            format!("\n{}type: {:?}, type: {:?} :", idt, tree.entry, t),
-        NodeType::StructOrUnion(t) =>
-            format!("\n{}type: {:?}, type: {:?} :", idt, tree.entry, t),
-        NodeType::EnumSpecifier(n) =>
-            format!("\n{}type: {:?}, name: {:?} :", idt, tree.entry, n),
-        NodeType::TypeQualifier(t) =>
-            format!("\n{}type: {:?}, type: {:?} :", idt, tree.entry, t),
-        NodeType::FunctionSpecifier(n) =>
-            format!("\n{}type: {:?}, name: {:?} :", idt, tree.entry, n),
-        NodeType::DirectDeclaratorPost(punc) =>
-            format!("\n{}type: {:?}, punctuator: {:?} :", idt, tree.entry, punc),
-        NodeType::ParameterTypeList(has_var_arg_list) =>
-            format!("\n{}type: {:?}, has_var_arg_list: {}", idt, tree.entry, has_var_arg_list),
-        NodeType::DirectAbstractDeclaratorBlock(punc) =>
-            format!("\n{}type: {:?}, punctuator: {:?} :", idt, tree.entry, punc),
-        NodeType::LabeledStatement(name) =>
-            format!("\n{}type: {:?}, key: {:?} :", idt, tree.entry, name),
-        NodeType::SelectionStatement(name) =>
-            format!("\n{}type: {:?}, key: {:?} :", idt, tree.entry, name),
-        NodeType::IterationStatement(name) =>
-            format!("\n{}type: {:?}, key: {:?} :", idt, tree.entry, name),
-        NodeType::JumpStatement(name, label) =>
-            format!("\n{}type: {:?} key: {}, label: {}", idt, tree.entry, name,
-                match label {
-                    Some(s) => s,
-                    None => "none"
-                }),
-        _ => // format!(""),
-            format!("\n{}type: {:?}:", idt, tree.entry),
+    let title: String = match &tree.entry {
+        NodeType::BinaryExpression(op) => {
+            format!("\n{}type: {:?}, op: {:?} :", idt, tree.entry, op)
+        }
+        NodeType::Constant(t) => format!("\n{}type: {:?}, type: {:?} :", idt, tree.entry, t),
+        NodeType::EnumerationConstant(s) => {
+            format!("\n{}type: {:?}, name: {:?}", idt, tree.entry, s)
+        }
+        NodeType::Identifier(name) => format!("\n{}type: {:?}, name: {:?}", idt, tree.entry, name),
+        NodeType::STRING(val) => format!("\n{}type: {:?}, val: {}", idt, tree.entry, val),
+        NodeType::PostfixExpressionPost(punc) => {
+            format!("\n{}type: {:?}, punc: {:?}", idt, tree.entry, punc)
+        }
+        NodeType::UnaryExpression(op) => format!("\n{}type: {:?}, op: {:?} :", idt, tree.entry, op),
+        NodeType::UnaryOperator(op) => format!("\n{}type: {:?}, op: {:?} :", idt, tree.entry, op),
+        NodeType::AssignmentOperator(op) => {
+            format!("\n{}type: {:?}, op: {:?} :", idt, tree.entry, op)
+        }
+        NodeType::StorageClassSpecifier(class) => {
+            format!("\n{}type: {:?}, class: {:?} :", idt, tree.entry, class)
+        }
+        NodeType::TypeSpecifier(t) => format!("\n{}type: {:?}, type: {:?} :", idt, tree.entry, t),
+        NodeType::StructOrUnion(t) => format!("\n{}type: {:?}, type: {:?} :", idt, tree.entry, t),
+        NodeType::EnumSpecifier(n) => format!("\n{}type: {:?}, name: {:?} :", idt, tree.entry, n),
+        NodeType::TypeQualifier(t) => format!("\n{}type: {:?}, type: {:?} :", idt, tree.entry, t),
+        NodeType::FunctionSpecifier(n) => {
+            format!("\n{}type: {:?}, name: {:?} :", idt, tree.entry, n)
+        }
+        NodeType::DirectDeclaratorPost(punc) => {
+            format!("\n{}type: {:?}, punctuator: {:?} :", idt, tree.entry, punc)
+        }
+        NodeType::ParameterTypeList(has_var_arg_list) => format!(
+            "\n{}type: {:?}, has_var_arg_list: {}",
+            idt, tree.entry, has_var_arg_list
+        ),
+        NodeType::DirectAbstractDeclaratorBlock(punc) => {
+            format!("\n{}type: {:?}, punctuator: {:?} :", idt, tree.entry, punc)
+        }
+        NodeType::LabeledStatement(name) => {
+            format!("\n{}type: {:?}, key: {:?} :", idt, tree.entry, name)
+        }
+        NodeType::SelectionStatement(name) => {
+            format!("\n{}type: {:?}, key: {:?} :", idt, tree.entry, name)
+        }
+        NodeType::IterationStatement(name) => {
+            format!("\n{}type: {:?}, key: {:?} :", idt, tree.entry, name)
+        }
+        NodeType::JumpStatement(name, label) => format!(
+            "\n{}type: {:?} key: {}, label: {}",
+            idt,
+            tree.entry,
+            name,
+            match label {
+                Some(s) => s,
+                None => "none",
+            }
+        ),
+        _ =>
+        // format!(""),
+        {
+            format!("\n{}type: {:?}:", idt, tree.entry)
+        }
     };
     let mut tree_s = "".to_string();
     for it in tree.child.iter() {
-        tree_s += &parser_pretty_printer(it, depth+1);
+        tree_s += &parser_pretty_printer(it, depth + 1);
     }
     return format!("{}{}", title, tree_s);
 }
