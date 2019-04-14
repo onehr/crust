@@ -57,6 +57,7 @@ fn p_identifier(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize
 
 fn p_primary_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), String> {
     check_pos(pos, toks.len())?;
+
     let mut cur_node = ParseNode::new(NodeType::PrimaryExpression);
     if let Ok((child_node, new_pos)) = p_identifier(toks, pos) {
         cur_node.child.push(child_node);

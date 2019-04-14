@@ -3,6 +3,7 @@
 //       2. seperate each TokType to their type, now just a global type TokType.
 //       3. add some check in lexer for enum and typedef
 //       4. add floating pointer support.
+//       5. number with postfix
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum TokType {
@@ -219,7 +220,7 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                 s.push(c);
                 while let Some(&tmp) = it.peek() {
                     match tmp {
-                        'a'...'z' | 'A'...'Z' | '_' => {
+                        'a'...'z' | 'A'...'Z' | '0'...'9' | '_' => {
                             s.push(tmp);
                             it.next();
                         }
