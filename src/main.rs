@@ -30,7 +30,16 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let tokens = lexer::lex(&input_file_contents)?;
 
     if opts.crust_debug_flags().print_source_token() {
-        println!("Tokens: \n{:?}\n", tokens);
+        println!("Tokens: \n");
+        let mut inc = 0;
+        for it in tokens.iter() {
+            print!("{}: [{:?}] ", inc, it);
+            inc += 1;
+            if inc % 5 == 0 {
+                println!("");
+            }
+        }
+        println!("");
     }
 
     let root_node = parser::parser_driver(&input_file_contents, &input_file.display().to_string())?;
