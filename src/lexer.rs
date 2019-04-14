@@ -1,58 +1,122 @@
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub enum KwdType {
-    Int,      // int
-    Void,     // void
-    Ret,      // return
-    If,       // if
-    Else,     // else
-    While,    // while
-    For,      // for
-    Do,       // do
-    Break,    // break
-    Continue, // continue
-}
+// Simple lexer V0.1 for supporting c11 standard, some situations should be added later.
+// TODO: 1. add token information
+//       2. seperate each TokType to their type, now just a global type TokType.
+//       3. add some check in lexer for enum and typedef
+//       4. add floating pointer support.
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum TokType {
-    Kwd(KwdType),
-    LBrace,             // {
-    RBrace,             // }
-    LParen,             // (
-    RParen,             // )
-    LBracket,           // [
-    RBracket,           // ]
-    Semicolon,          // ;
-    Assign,             // =
-    Lt,                 // <
-    Gt,                 // >
-    Minus,              // -
-    Tilde,              // ~
-    Exclamation,        // !
-    Plus,               // +
-    Multi,              // *
-    Splash,             // /
-    Literal(i64),       // [0-9]+
-    Identifier(String), // identifier
-    And,                // &&
-    Or,                 // ||
-    Equal,              // ==
-    NotEqual,           // !=
-    LessEqual,          // <=
-    GreaterEqual,       // >=
-    Colon,              // :
-    QuestionMark,       // ?
-    Comma,              // ,
-    String(String, String),
-    Addr,               // &var
+    LBrace,       // {
+    RBrace,       // }
+    LParen,       // (
+    RParen,       // )
+    LBracket,     // [
+    RBracket,     // ]
+    Semicolon,    // ;
+    Assign,       // =
+    Lt,           // <
+    Gt,           // >
+    Minus,        // -
+    Tilde,        // ~
+    Exclamation,  // !
+    Plus,         // +
+    Multi,        // *
+    Splash,       // /
+    Colon,        // :
+    QuestionMark, // ?
+    Comma,        // ,
+    Dot,          // .
+    SingleAnd,    // &
+    InclusiveOr,  // |
+    ExclusiveOr,  // ^
+    Mod,          // %
+    IDENTIFIER(String),
+    IConstant(i64),
+    FConstant(f64),
+    StringLiteral(String, String),
+    FuncName, // __func__
+    SIZEOF, // sizeof
+    PtrOp, // ->
+    IncOp, // ++
+    DecOp, // --
+    LeftOp, // <<
+    RightOp, // >>
+    LeOp, // <=
+    GeOp, // >=
+    EqOp, // ==
+    NeOp, // !=
+    AndOp, // &&
+    OrOp, // ||
+    MulAssign, // *=
+    DivAssign, // /=
+    ModAssign, // %=
+    AddAssign, // +=
+    SubAssign, // -=
+    LeftAssign, // <<=
+    RightAssign, // >>=
+    AndAssign, // &=
+    XorAssign, // ^=
+    OrAssign, // |=
+    // TODO: this should be done when we found this is a typedef name,
+    //       typedef LL int, then LL is typedef_name
+    TypedefName,
+    ELLIPSIS, // ...
+    EnumerationConstant(String), // TODO: add check
+    TYPEDEF,
+    EXTERN,
+    STATIC,
+    AUTO,
+    REGISTER,
+    INLINE,
+    CONST,
+    RESTRICT,
+    VOLATILE,
+    BOOL,
+    CHAR,
+    SHORT,
+    INT,
+    LONG,
+    SIGNED,
+    UNSIGNED,
+    FLOAT,
+    DOUBLE,
+    VOID,
+    COMPLEX,
+    IMAGINARY,
+    STRUCT,
+    UNION,
+    ENUM,
+    CASE,
+    DEFAULT,
+    IF,
+    ELSE,
+    SWITCH,
+    WHILE,
+    DO,
+    FOR,
+    GOTO,
+    CONTINUE,
+    BREAK,
+    RETURN,
+    ALIGNAS,
+    ALIGNOF,
+    ATOMIC,
+    GENERIC,
+    NORETURN,
+    StaticAssert,
+    ThreadLocal,
 }
 
-static mut LABEL_COUNTER: i64 = -1;
+use std::sync::atomic;
+
+static LABEL_COUNTER: atomic::AtomicUsize = atomic::AtomicUsize::new(0);
 fn gen_string_tag() -> String {
-    unsafe {
-        LABEL_COUNTER = LABEL_COUNTER + 1;
-        return format!(".LSTR{}", LABEL_COUNTER);
-    }
+    let label_counter = LABEL_COUNTER.fetch_add(1, atomic::Ordering::SeqCst);
+    let label = format!(".LSTR{}", label_counter);
+
+    label
 }
+
 pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
     let mut result = Vec::new();
 
@@ -71,13 +135,11 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                     s.push(c);
                     it.next();
                 }
-                result.push(TokType::String(s, gen_string_tag()));
+                result.push(TokType::StringLiteral(s, gen_string_tag()));
                 it.next();
             }
             '\'' => {
                 // try parse a char
-                // now just use int to represent char
-                // transform it to int
                 it.next(); // skip '
                 let &c = it.peek().unwrap();
                 if c == '\'' {
@@ -88,40 +150,40 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                     let &c = it.peek().unwrap();
                     match c {
                         'a' => {
-                            result.push(TokType::Literal(0x07));
+                            result.push(TokType::IConstant(0x07));
                         } // Alert (Beep, Bell) (added in C89)
                         'b' => {
-                            result.push(TokType::Literal(0x08));
+                            result.push(TokType::IConstant(0x08));
                         } // Backspace
                         'e' => {
-                            result.push(TokType::Literal(0x1B));
+                            result.push(TokType::IConstant(0x1B));
                         } // escape character
                         'f' => {
-                            result.push(TokType::Literal(0x0C));
+                            result.push(TokType::IConstant(0x0C));
                         } // Formfeed Page Break
                         'n' => {
-                            result.push(TokType::Literal(0x0A));
+                            result.push(TokType::IConstant(0x0A));
                         } // Newline (Line Feed)
                         'r' => {
-                            result.push(TokType::Literal(0x0D));
+                            result.push(TokType::IConstant(0x0D));
                         } // Carriage Return
                         't' => {
-                            result.push(TokType::Literal(0x09));
+                            result.push(TokType::IConstant(0x09));
                         } // Horizontal Tab
                         'v' => {
-                            result.push(TokType::Literal(0x0B));
+                            result.push(TokType::IConstant(0x0B));
                         } // Vertical Tab
                         '\\' => {
-                            result.push(TokType::Literal(0x5C));
+                            result.push(TokType::IConstant(0x5C));
                         } // Backslash
                         '\'' => {
-                            result.push(TokType::Literal(0x27));
+                            result.push(TokType::IConstant(0x27));
                         } // Apostrophe or single quotation mark
                         '\"' => {
-                            result.push(TokType::Literal(0x22));
+                            result.push(TokType::IConstant(0x22));
                         } // Double quotation mark
                         '?' => {
-                            result.push(TokType::Literal(0x3F));
+                            result.push(TokType::IConstant(0x3F));
                         } // question mark
                         _ => {
                             return Err(format!("unrecongnized character"));
@@ -133,7 +195,7 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                     }
                     it.next();
                 } else {
-                    result.push(TokType::Literal(c as i64));
+                    result.push(TokType::IConstant(c as i64));
                     it.next(); // skip char
                     it.next(); // skip '
                 }
@@ -149,7 +211,7 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                     number = number * 10 + digit;
                     it.next();
                 }
-                result.push(TokType::Literal(number));
+                result.push(TokType::IConstant(number));
             }
             'a'...'z' | 'A'...'Z' | '_' => {
                 it.next();
@@ -167,18 +229,52 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                     }
                 }
                 match s.as_ref() {
-                    "int" => result.push(TokType::Kwd(KwdType::Int)),
-                    "char" => result.push(TokType::Kwd(KwdType::Int)),
-                    "return" => result.push(TokType::Kwd(KwdType::Ret)),
-                    "void" => result.push(TokType::Kwd(KwdType::Void)),
-                    "if" => result.push(TokType::Kwd(KwdType::If)),
-                    "else" => result.push(TokType::Kwd(KwdType::Else)),
-                    "while" => result.push(TokType::Kwd(KwdType::While)),
-                    "for" => result.push(TokType::Kwd(KwdType::For)),
-                    "do" => result.push(TokType::Kwd(KwdType::Do)),
-                    "continue" => result.push(TokType::Kwd(KwdType::Continue)),
-                    "break" => result.push(TokType::Kwd(KwdType::Break)),
-                    _ => result.push(TokType::Identifier(s)),
+                    "auto" => result.push(TokType::AUTO),
+                    "break" => result.push(TokType::BREAK),
+                    "case" => result.push(TokType::CASE),
+                    "char" => result.push(TokType::CHAR),
+                    "const" => result.push(TokType::CONST),
+                    "continue" => result.push(TokType::CONTINUE),
+                    "default" => result.push(TokType::DEFAULT),
+                    "do" => result.push(TokType::DO),
+                    "double" => result.push(TokType::DOUBLE),
+                    "else" => result.push(TokType::ELSE),
+                    "enum" => result.push(TokType::ENUM),
+                    "extern" => result.push(TokType::EXTERN),
+                    "float" => result.push(TokType::FLOAT),
+                    "for" => result.push(TokType::FOR),
+                    "goto" => result.push(TokType::GOTO),
+                    "if" => result.push(TokType::IF),
+                    "inline" => result.push(TokType::INLINE),
+                    "int" => result.push(TokType::INT),
+                    "long" => result.push(TokType::LONG),
+                    "register" => result.push(TokType::REGISTER),
+                    "restrict" => result.push(TokType::RESTRICT),
+                    "return" => result.push(TokType::RETURN),
+                    "short" => result.push(TokType::SHORT),
+                    "signed" => result.push(TokType::SIGNED),
+                    "sizeof" => result.push(TokType::SIZEOF),
+                    "static" => result.push(TokType::STATIC),
+                    "struct" => result.push(TokType::STRUCT),
+                    "switch" => result.push(TokType::SWITCH),
+                    "typedef" => result.push(TokType::TYPEDEF),
+                    "union" => result.push(TokType::UNION),
+                    "unsigned" => result.push(TokType::UNSIGNED),
+                    "void" => result.push(TokType::VOID),
+                    "volatile" => result.push(TokType::VOLATILE),
+                    "while" => result.push(TokType::WHILE),
+                    "_Alignas" => result.push(TokType::ALIGNAS),
+                    "_Alignof" => result.push(TokType::ALIGNOF),
+                    "_Atomic" => result.push(TokType::ATOMIC),
+                    "_Bool" => result.push(TokType::BOOL),
+                    "_Complex" => result.push(TokType::COMPLEX),
+                    "_Generic" => result.push(TokType::GENERIC),
+                    "_Imaginary" => result.push(TokType::IMAGINARY),
+                    "_Noreturn" => result.push(TokType::NORETURN),
+                    "_Static_assert" => result.push(TokType::StaticAssert),
+                    "_Thread_local" => result.push(TokType::ThreadLocal),
+                    "__func__" => result.push(TokType::FuncName),
+                    _ => result.push(TokType::IDENTIFIER(s)),
                 }
             }
             '(' => {
@@ -214,11 +310,7 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                 match it.peek() {
                     Some(tmp) => match tmp {
                         '=' => {
-                            result.push(TokType::Equal);
-                            it.next();
-                        }
-                        '>' => {
-                            result.push(TokType::GreaterEqual);
+                            result.push(TokType::EqOp);
                             it.next();
                         }
                         _ => {
@@ -234,15 +326,35 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                     Some(tmp) => match tmp {
                         '=' => {
                             it.next();
-                            result.push(TokType::LessEqual);
+                            result.push(TokType::LeOp);
                             it.next();
+                        }
+                        '<' => {
+                            it.next();
+                            match it.peek() {
+                                Some(tmp) => match tmp {
+                                    '=' => {
+                                        it.next();
+                                        result.push(TokType::LeftAssign); // <<=
+                                        it.next();
+                                    }
+                                    _ => {
+                                        result.push(TokType::LeftOp);
+                                        it.next();
+                                    }
+                                }
+                                _ => {
+                                    result.push(TokType::LeftOp);
+                                }
+                            }
                         }
                         _ => {
                             result.push(TokType::Lt);
-                            it.next();
                         }
                     },
-                    _ => return Err(format!("Can not peek next char")),
+                    _ =>  {
+                        result.push(TokType::Lt);
+                    }
                 }
             }
             '>' => {
@@ -250,20 +362,59 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                 match it.peek() {
                     Some(tmp) => match tmp {
                         '=' => {
-                            result.push(TokType::GreaterEqual);
+                            result.push(TokType::GeOp);
                             it.next();
+                        }
+                        '>' => {
+                            it.next();
+                            match it.peek() {
+                                Some(tmp) => match tmp {
+                                    '=' => {
+                                        result.push(TokType::RightAssign);
+                                        it.next();
+                                    }
+                                    _ => {
+                                        result.push(TokType::RightOp);
+                                    }
+                                }
+                                _ => {
+                                    result.push(TokType::RightOp);
+                                }
+                            }
                         }
                         _ => {
                             result.push(TokType::Gt);
-                            it.next();
                         }
                     },
-                    _ => return Err(format!("Can not peek next char")),
+                    _ => {
+                        result.push(TokType::Gt);
+                    }
                 }
             }
             '-' => {
-                result.push(TokType::Minus);
                 it.next();
+                match it.peek() {
+                    Some(tmp) => match tmp {
+                        '-' => {
+                            result.push(TokType::DecOp);
+                            it.next();
+                        }
+                        '=' => {
+                            result.push(TokType::SubAssign);
+                            it.next();
+                        }
+                        '>' => {
+                            result.push(TokType::PtrOp);
+                            it.next();
+                        }
+                        _ => {
+                            result.push(TokType::Minus);
+                        }
+                    },
+                    _ => {
+                        result.push(TokType::Minus);
+                    }
+                }
             }
             '~' => {
                 result.push(TokType::Tilde);
@@ -274,7 +425,7 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                 match it.peek() {
                     Some(tmp) => match tmp {
                         '=' => {
-                            result.push(TokType::NotEqual);
+                            result.push(TokType::NeOp);
                             it.next();
                         }
                         _ => {
@@ -285,32 +436,92 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                 }
             }
             '+' => {
-                result.push(TokType::Plus);
                 it.next();
+                match it.peek().unwrap() {
+                    '+' => {
+                        result.push(TokType::IncOp);
+                        it.next();
+                    }
+                    '=' => {
+                        result.push(TokType::AddAssign);
+                        it.next();
+                    }
+                    _ => {
+                        result.push(TokType::Plus);
+                    }
+                }
             }
             '*' => {
-                result.push(TokType::Multi);
                 it.next();
+                match it.peek() {
+                    Some(tmp) => match tmp {
+                        '=' => {
+                            result.push(TokType::MulAssign);
+                            it.next();
+                        }
+                        _ => {
+                            result.push(TokType::Multi);
+                        }
+                    },
+                    _ => {
+                        result.push(TokType::Multi);
+                    }
+                }
+            }
+            '%' => {
+                it.next();
+                match it.peek() {
+                    Some(tmp) => match tmp {
+                        '=' => {
+                            result.push(TokType::ModAssign);
+                            it.next();
+                        }
+                        _ => {
+                            result.push(TokType::Mod);
+                        }
+                    },
+                    _ => {
+                        result.push(TokType::Mod);
+                    }
+                }
             }
             '/' => {
-                result.push(TokType::Splash);
                 it.next();
+                match it.peek() {
+                    Some(tmp) => match tmp {
+                        '=' => {
+                            result.push(TokType::DivAssign);
+                            it.next();
+                        }
+                        _ => {
+                            result.push(TokType::Splash);
+                        }
+                    },
+                    _ => {
+                        result.push(TokType::Splash);
+                    }
+                }
             }
             '&' => {
                 it.next();
                 match it.peek() {
                     Some(tmp) => match tmp {
                         '&' => {
-                            result.push(TokType::And);
+                            result.push(TokType::AndOp);
+                            it.next();
+                        }
+                        '=' => {
+                            result.push(TokType::AndAssign);
                             it.next();
                         }
                         _ => {
-                            // now don't support bitwise and, so just return Err
                             // & operator to get the address of a variable
-                            result.push(TokType::Addr);
+                            result.push(TokType::SingleAnd);
                         }
                     },
-                    _ => return Err(format!("Can not peek next char")),
+                    _ => {
+                        result.push(TokType::SingleAnd);
+                    }
                 }
             }
             '|' => {
@@ -318,15 +529,38 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                 match it.peek() {
                     Some(tmp) => match tmp {
                         '|' => {
-                            result.push(TokType::Or);
+                            result.push(TokType::OrOp);
+                            it.next();
+                        }
+                        '=' => {
+                            result.push(TokType::OrAssign);
                             it.next();
                         }
                         _ => {
                             // now don't support bitwise or, so just return Err
-                            return Err(format!("unexpected token {}", c));
+                            result.push(TokType::InclusiveOr);
                         }
                     },
-                    _ => return Err(format!("Can not peek next char")),
+                    _ => {
+                        result.push(TokType::InclusiveOr);
+                    }
+                }
+            }
+            '^' => {
+                it.next();
+                match it.peek() {
+                    Some(tmp) => match tmp {
+                        '=' => {
+                            result.push(TokType::XorAssign);
+                            it.next();
+                        }
+                        _ => {
+                            result.push(TokType::ExclusiveOr);
+                        }
+                    }
+                    _ => {
+                        result.push(TokType::ExclusiveOr);
+                    }
                 }
             }
             '?' => {

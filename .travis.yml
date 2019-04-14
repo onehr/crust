@@ -31,7 +31,7 @@ matrix:
 script:
   - eval "${MATRIX_EVAL}"
   - mkdir gen/
-  - bash test.sh
+  - bash test_parser.sh
 
 
 addons:

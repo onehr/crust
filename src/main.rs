@@ -1,4 +1,5 @@
-mod gen;
+//mod gen;
+mod ast;
 mod lexer;
 mod opts;
 mod parser;
@@ -27,22 +28,23 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 
     let tokens = lexer::lex(&input_file_contents)?;
-    let root_node = parser::parse_prog(&input_file_contents, &input_file.display().to_string())?;
+
+    let root_node = parser::parser_driver(&input_file_contents, &input_file.display().to_string())?;
 
     if opts.crust_debug_flags().print_source_ast() {
-        println!("Source AST:\n{}\n", parser::print(&root_node, 0))
+        println!("Source AST:\n{}\n", parser::parser_pretty_printer(&root_node, 0))
     }
 
     if opts.crust_debug_flags().print_filenames() {
         println!("Output file: {}\n", opts.output().display());
     }
 
-    let output_file_contents = gen::gen_prog(&root_node);
+    // let output_file_contents = gen::gen_prog(&root_node);
 
     if opts.crust_debug_flags().print_file_contents() {
-        println!("File contents:\n{}\n", output_file_contents)
+        // println!("File contents:\n{}\n", output_file_contents)
     }
 
-    fs::write(opts.output(), output_file_contents)?;
+    // fs::write(opts.output(), output_file_contents)?;
     Ok(())
 }
