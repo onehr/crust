@@ -35,8 +35,6 @@ script:
   - eval "${MATRIX_EVAL}"
   - mkdir gen/
   - bash test_parser.sh
-  - fossa init
-  - fossa analyze
 
 addons:
   apt:
