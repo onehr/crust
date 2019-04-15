@@ -1,9 +1,25 @@
-// Simple lexer V0.1 for supporting c11 standard, some situations should be added later.
-// TODO: 1. add token information
+//     Copyright 2019 Haoran Wang
+//
+//     Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+//     You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+//     distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//     See the License for the specific language governing permissions and
+//     limitations under the License.
+// ------------------------------------------------------------------------
+// lexer.rs: lexer for c11 tokens.
+//           some situations should be added later.
+// ------------------------------------------------------------------------
+// TODO: 1. add token information for error message.
 //       2. seperate each TokType to their type, now just a global type TokType.
-//       3. add some check in lexer for enum and typedef
+//       3. add some check in lexer for enum and typedef.
 //       4. add floating pointer support.
-//       5. number with postfix
+//       5. number with postfix.
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum TokType {

@@ -1,13 +1,30 @@
+//     Copyright 2019 Haoran Wang
+//
+//     Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+//     You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+//     distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//     See the License for the specific language governing permissions and
+//     limitations under the License.
+// ------------------------------------------------------------------------
+// parser.rs:
+//           try to support all c11 features, version 0.1
+// ------------------------------------------------------------------------
+
 use crate::ast::{ConstantType, NodeType, ParseNode};
 use crate::lexer;
 
-// parser: try to support all c11 features, v0.1 by Haoran Wang
 // XXX: How to handle error message properly should be improved later
 //      and some uncommon situations support should be added.
 
-// ---------------------------------------------------------------------------------
+// ------------------------------------------------------------------------
 // helper function
-// ---------------------------------------------------------------------------------
+// ------------------------------------------------------------------------
 fn error_handler(expect: &str, toks: &lexer::TokType, pos: usize) -> String {
     // return a detailed error message.
     // now it could be simple, just print the token information
