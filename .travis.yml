@@ -34,7 +34,7 @@ before_script:
 script:
   - eval "${MATRIX_EVAL}"
   - mkdir gen/
-  - bash test_parser.sh
+  - bash test_dev.sh
 
 addons:
   apt:
