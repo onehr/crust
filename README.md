@@ -1,5 +1,6 @@
 # CRUST
-[![Build Status](https://travis-ci.com/onehr/crust.svg?branch=master)](https://travis-ci.com/onehr/crust)
+[![Build Status](https://travis-ci.com/onehr/crust.svg?branch=master)](https://travis-ci.com/onehr/crust)[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fonehr%2Fcrust.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fonehr%2Fcrust?ref=badge_shield)
+
 [![Gitter](https://badges.gitter.im/crust-dev/community.svg)](https://gitter.im/crust-dev/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 A simple C compiler written in the Rust-lang. (early development stage, started at Mar 30, 2019)
@@ -491,3 +492,7 @@ Now, only four basic parts:
 4. `generator` 
 
 Will add more layers in the future, like `semantics analyzer`, `IR generator`, simple `Optimizer` and `instruction generator`.
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fonehr%2Fcrust.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fonehr%2Fcrust?ref=badge_large)
