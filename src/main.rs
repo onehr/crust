@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let contents_after_cpp = cpp::cpp_driver(input_file_contents)?;
 
     if opts.stop_stage().preprocess() {
-        fs::write(opts.output(), contents_after_cpp);
+        fs::write(opts.output(), contents_after_cpp)?;
         return Ok(());
     }
 
