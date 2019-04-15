@@ -33,7 +33,7 @@ do
     fi
 done
 
-srcdir=sample_code/
+srcdir=sample_code
 for f in $srcdir/*.c
 do
     inc=$(($inc+1))
@@ -64,6 +64,21 @@ done
 
 # should cause no error
 srcdir=test/valid/parser
+for f in $srcdir/*.c
+do
+    inc=$(($inc+1))
+    file=${f%.*}
+    crust_compile $file ./gen/$file
+    if [ "$?" -ne 0 ]; then
+        echo -e "[${RED}Error${NC}]"
+        exit 1
+    else
+        echo -e "[${BLUE}parse ok${NC}]"
+    fi
+done
+
+# test for preprocessor
+srcdir=test/valid/cpp
 for f in $srcdir/*.c
 do
     inc=$(($inc+1))

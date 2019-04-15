@@ -1,10 +1,12 @@
 //mod gen;
+mod cpp;
 mod ast;
 mod lexer;
 mod opts;
 mod parser;
 
 use std::{error, fs};
+use crate::opts::StopStage;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let opts: opts::Opts = {
@@ -27,7 +29,16 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         println!("File contents:\n{}\n", input_file_contents)
     }
 
-    let tokens = lexer::lex(&input_file_contents)?;
+    // 1. Preprocessing
+    let contents_after_cpp = cpp::cpp_driver(input_file_contents)?;
+
+    if opts.stop_stage().preprocess() {
+        fs::write(opts.output(), contents_after_cpp);
+        return Ok(());
+    }
+
+    // 2. lexing
+    let tokens = lexer::lex(&contents_after_cpp)?;
 
     if opts.crust_debug_flags().print_source_token() {
         println!("Tokens: \n");
@@ -42,7 +53,8 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         println!("");
     }
 
-    let root_node = parser::parser_driver(&input_file_contents, &input_file.display().to_string())?;
+    // 3. parsing
+    let root_node = parser::parser_driver(&tokens, &input_file.display().to_string())?;
 
     if opts.crust_debug_flags().print_source_ast() {
         println!(

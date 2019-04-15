@@ -18,7 +18,7 @@
 // TODO: 1. add token information for error message.
 //       2. seperate each TokType to their type, now just a global type TokType.
 //       3. add some check in lexer for enum and typedef.
-//       4. add floating pointer support.
+//       4. add floating point number support.
 //       5. number with postfix.
 
 #[derive(PartialEq, Clone, Debug)]

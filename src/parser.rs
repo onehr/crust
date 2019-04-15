@@ -2878,9 +2878,7 @@ fn p_translation_unit(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode,
     return Ok((cur_node, pos));
 }
 
-pub fn parser_driver(input: &str, c_src_name: &str) -> Result<ParseNode, String> {
-    let toks = lexer::lex(&input)?;
-
+pub fn parser_driver(toks: &[lexer::TokType], c_src_name: &str) -> Result<ParseNode, String> {
     let (cur_node, pos) = p_translation_unit(&toks, 0)?;
     if pos == toks.len() {
         return Ok(cur_node);
