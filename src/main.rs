@@ -1,12 +1,12 @@
 //mod gen;
-mod cpp;
 mod ast;
+mod cpp;
 mod lexer;
 mod opts;
 mod parser;
 
-use std::{error, fs};
 use crate::opts::StopStage;
+use std::{error, fs};
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let opts: opts::Opts = {
@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 
     // 1. Preprocessing
-    let contents_after_cpp = cpp::cpp_driver(input_file_contents)?;
+    let contents_after_cpp = cpp::cpp_driver(input_file_contents, input_file.clone())?;
 
     if opts.stop_stage().preprocess() {
         fs::write(opts.output(), contents_after_cpp)?;

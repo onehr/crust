@@ -77,7 +77,9 @@ impl CrustDebugFlags {
         self.print_source_ast
     }
 
-    pub fn print_source_token(&self) -> bool { self.print_source_token }
+    pub fn print_source_token(&self) -> bool {
+        self.print_source_token
+    }
 }
 
 impl StopStage {
