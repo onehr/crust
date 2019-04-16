@@ -180,8 +180,7 @@ fn remove_comment(input: String) -> Result<String, String> {
 }
 
 fn include_headers(input: String, parent: Option<&Path>) -> Result<String, Box<dyn error::Error>> {
-    // TODO: now only support #include directive
-    //       and also only support "header.h", system header file not supported now
+    // TODO: now only support "header.h", system header file not supported now
     //       should add system header support when the macro expension was finished and
     //       other directives are supported.
     fn include_file_path(relational_name: &str) -> Result<&Path, String> {
@@ -203,21 +202,29 @@ fn include_headers(input: String, parent: Option<&Path>) -> Result<String, Box<d
         match char::from(line.trim_start().as_bytes()[0]) {
             '#' => {
                 let a: Vec<&str> = line.split_whitespace().collect();
-                if *a.get(0).unwrap() == "#include" {
-                    // can only handle #include now.
-                    let file_name = include_file_path(*a.get(1).unwrap())?;
-                    let full_relational_path = file_name;
+                let directive = *a.get(0).unwrap();
+                match directive {
+                    "#include" => {
+                        let file_name = include_file_path(*a.get(1).unwrap())?;
+                        let full_relational_path = file_name;
 
-                    match parent {
-                        None => {
-                            let header_contents = fs::read_to_string(full_relational_path)?;
-                            res.push_str(include_headers(header_contents, None)?.as_ref());
+                        match parent {
+                            None => {
+                                let header_contents = fs::read_to_string(full_relational_path)?;
+                                res.push_str(include_headers(header_contents, None)?.as_ref());
+                            }
+                            Some(p_dir) => {
+                                let full_relational_path = p_dir.join(file_name);
+                                let header_contents = fs::read_to_string(full_relational_path)?;
+                                res.push_str(include_headers(header_contents, parent)?.as_ref());
+                            }
                         }
-                        Some(p_dir) => {
-                            let full_relational_path = p_dir.join(file_name);
-                            let header_contents = fs::read_to_string(full_relational_path)?;
-                            res.push_str(include_headers(header_contents, parent)?.as_ref());
-                        }
+
+                    }
+                    _ => {
+                        // just leave other directives to be handled by the directive_handler
+                        res.push_str(line);
+                        res.push_str("\n");
                     }
                 }
             }
@@ -231,6 +238,114 @@ fn include_headers(input: String, parent: Option<&Path>) -> Result<String, Box<d
     return Ok(res);
 }
 
+#[macro_use]
+use lazy_static;
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+lazy_static::lazy_static! {
+    static ref DEFINE_OBJ: Mutex<HashMap<String, String>> = {
+        let m = HashMap::new();
+        Mutex::new(m)
+    };
+}
+
+fn replace(input: String) -> String {
+    // This is a function, which replace the string if contains defined identifier.
+    let mut it = input.chars().peekable();
+    let mut res = String::new();
+    while let Some(&c) = it.peek() {
+        match c {
+            'a'...'z' | 'A'...'Z' | '_' => {
+                it.next();
+                let mut id = String::new();
+                id.push(c);
+                while let Some(&tmp) = it.peek() {
+                    match tmp {
+                        'a'...'z' | 'A'...'Z' | '0'...'9' | '_' => {
+                            id.push(tmp);
+                            it.next();
+                        }
+                        _ => {
+                            break;
+                        }
+                    }
+                }
+                let mut get_val = String::new();
+                match DEFINE_OBJ.lock().unwrap().get(&id) {
+                    Some(s) => {
+                        // XXX: I use this method to get rid of deadlock.
+                        //      cause call replace function in this scope will cause the
+                        //      child function to lock the DEFINE_OBJ, which is locked here.
+                        get_val.push_str(s);
+                    }
+                    None => {
+                        res.push_str(&id);
+                    }
+                }
+                // after the lock was released, can lock in child replace function
+                res.push_str(&replace(get_val));
+            }
+            _ => {
+                res.push(c);
+                it.next();
+            }
+        }
+    }
+    return res;
+}
+
+
+fn directive_handler(input: String) -> Result<String, Box<dyn error::Error>> {
+    // TODO: now only support #define directive
+    let mut res = String::new();
+
+    for line in input.lines() {
+        if line.trim_start().is_empty() {
+            // empty line
+            res.push_str("\n");
+            continue;
+        }
+        match char::from(line.trim_start().as_bytes()[0]) {
+            '#' => {
+                let a: Vec<&str> = line.split_whitespace().collect();
+                let directive = *a.get(0).unwrap();
+                match directive {
+                    "#define" => {
+                        // TODO: now only support object-like macros
+                        //       macro names must identifier
+                        // remove this line and handle #define
+                        let name = String::from(*a.get(1).unwrap());
+                        let mut idx = 2;
+                        let mut replace_str = "".to_string();
+                        // cause split_whitespace() split the replace string apart, now need to combine them
+                        while idx < a.len() {
+                            replace_str.push_str(*a.get(idx).unwrap());
+                            idx += 1;
+                            if idx != a.len() {
+                                replace_str = replace_str + " ";
+                            }
+                        }
+                        let replace_str = replace(replace_str);
+                        DEFINE_OBJ.lock().unwrap().insert(name, replace_str);
+                    }
+                    _ => {
+                        res.push_str(line);
+                        res.push_str("\n");
+                    }
+                }
+            }
+            _ => {
+                // not directive starting sentence, so replace the token if it's defined before.
+                // check every identifier name
+                res.push_str(&replace(line.to_string()));
+                res.push('\n');
+            }
+        }
+    }
+    return Ok(res);
+}
+
 pub fn cpp_driver(input: String, path: PathBuf) -> Result<String, Box<dyn error::Error>> {
     let parent = path.parent();
     // include the header files in the source file
@@ -241,6 +356,8 @@ pub fn cpp_driver(input: String, path: PathBuf) -> Result<String, Box<dyn error:
     let after_cpp_str = line_concat(after_cpp_str)?;
     // remove comment
     let after_cpp_str = remove_comment(after_cpp_str)?;
+    // directives handler
+    let after_cpp_str = directive_handler(after_cpp_str)?;
 
     Ok(after_cpp_str)
 }
