@@ -34,7 +34,8 @@ we have already got some contributors now who are interested in building this pr
     - [X] Trigraph translation
     - [X] comment support `/**/ and //`
     - [X] line concatenation with ` \ `
-    - [ ] macro expansion
+    - [X] object-like macro expansion
+    - [ ] function-like macro expansion
     - [ ] should support all directives later
 - Lexer (working on)
     - [X] lex all c11 keywords
@@ -55,11 +56,11 @@ we have already got some contributors now who are interested in building this pr
 You need a valid rust environment, Cargo.
 
 ## Build
-(PS. Now the crust can only generate only preprocess, lex, and parse the source code, the generator was disabled now).
+(PS. Now the crust can only preprocess, lex, and parse the source code, the generator was disabled now).
 ```bash
 $ cargo build # use this command to build the project
 ```
-You can run with only preprocessor
+run
 ```shell
 $ cargo run -- -E source_file.c -o output_file.c # generate preprocessed file
 $ cargo run -- --crust-print-source-token source_file.c -o output_file.c # print the token
