@@ -8,9 +8,9 @@ rust:
 branches:
   only:
     # This is where pull requests from "bors r+" are built.
-    - dev
+    - staging
     # This is where pull requests from "bors try" are built.
-    - onehrxn
+    - trying
     # Uncomment this to enable building pull requests.
     #- master
 
