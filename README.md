@@ -8,7 +8,7 @@ A simple C compiler written in the Rust-lang. (early development stage, started 
 
 **(PS. this is the development branch, 
 if you want to see how to write a simple c compiler in rust, you should check 
-[branch master](https://github.com/onehr/crust/tree/master), 
+[branch toy](https://github.com/onehr/crust/tree/toy), 
 which contains a simple c compiler written in rust without extra libs, 
 it can read simple c source code and produce x86-64 assembly code).**
 
