@@ -1,12 +1,11 @@
 # CRUST
 [![Build Status](https://travis-ci.com/onehr/crust.svg?branch=master)](https://travis-ci.com/onehr/crust)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fonehr%2Fcrust.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fonehr%2Fcrust?ref=badge_shield)
-
 [![Gitter](https://badges.gitter.im/crust-dev/community.svg)](https://gitter.im/crust-dev/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 A simple C compiler written in the Rust-lang. (early development stage, started at Mar 30, 2019)
 
-(**PS. Now the master branch was paused, cause I was trying to achieve the milestone 0.1 in branch [staging](https://github.com/onehr/crust/tree/staging) and when it was finished, it will be merged back to branch master, now I just leave branch master as a simple toy.**)
+(**PS. Now the master branch was paused, cause I was trying to achieve the milestone 0.1 in branch [dev](https://github.com/onehr/crust/tree/dev) and when it was finished, it will be merged back to branch master, now I just leave branch master as a simple toy.**)
 
 ## Project Goal
 Should follow the C11 Standard and generate x86-64 Assembly Code from C source code.
