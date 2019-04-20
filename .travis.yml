@@ -12,7 +12,7 @@ branches:
     # This is where pull requests from "bors try" are built.
     - trying
     # Uncomment this to enable building pull requests.
-    - dev
+    - master
 
 notifications:
   webhooks:
