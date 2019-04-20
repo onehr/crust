@@ -64,8 +64,13 @@ pub enum BaseType {
     Int,
     Long,
     LongLong,
-    Pointer,
+    Float,
+    Double,
+    Pointer(Box<BaseType>),
     Function(Box<BaseType>, Vec<BaseType>),
+    Array(u64, Box<BaseType>), // len, element_type
+    Struct(Vec<BaseType>), // body
+    Union(Vec<BaseType>),
 }
 
 #[derive(PartialEq, Clone, Debug)]
