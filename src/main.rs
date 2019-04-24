@@ -6,7 +6,6 @@ mod opts;
 mod parser;
 mod symtable;
 
-use crate::opts::StopStage;
 use std::{error, fs};
 
 fn main() -> Result<(), Box<dyn error::Error>> {

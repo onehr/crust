@@ -17,7 +17,6 @@
 // -----------------------------------------------------------------------------
 
 use std::path::PathBuf;
-use std::process::id;
 use std::{error, fs, path::Path};
 
 fn trigraph_processor(input: String) -> Result<String, String> {
