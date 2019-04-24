@@ -1604,9 +1604,15 @@ fn p_init_declarator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, 
         cur_node.child.push(child_node);
         if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::Assign) {
             let pos = pos + 1;
-            cur_node.type_exp.child.push(pre_type);
             let (child_node, pos) = p_initializer(toks, pos)?;
-            cur_node.type_exp.child.push(child_node.type_exp.clone());
+
+            if judge_type_same(&pre_type, &child_node.type_exp) {
+                // ok
+            } else {
+                return Err(format!("init_declarator, can not assign"));
+            }
+
+            cur_node.type_exp = pre_type;
             cur_node.child.push(child_node);
 
             return Ok((cur_node, pos));
@@ -3590,13 +3596,13 @@ pub fn parser_pretty_printer(tree: &ParseNode, depth: usize) -> String {
     let idt = idt;
     let title: String = match &tree.entry {
         NodeType::BinaryExpression(op) => format!(
-            "\n{}type: {:?}, op: {:?} t_exp: {:?}:",
-            idt, tree.entry, op, tree.type_exp
+            "\n{}type: {:?}, op: {:?} t_exp: {}:",
+            idt, tree.entry, op, tree.type_exp.print()
         ),
         NodeType::Constant(t) => format!("\n{}type: {:?}, type: {:?} :", idt, tree.entry, t,),
         NodeType::EnumerationConstant(s) => format!(
-            "\n{}type: {:?}, name: {:?}, t_exp {:?}",
-            idt, tree.entry, s, tree.type_exp
+            "\n{}type: {:?}, name: {:?}, t_exp {}",
+            idt, tree.entry, s, tree.type_exp.print()
         ),
         NodeType::Identifier(name) => format!("\n{}type: {:?}, name: {:?}", idt, tree.entry, name),
         NodeType::STRING(val) => format!("\n{}type: {:?}, val: {}", idt, tree.entry, val),
@@ -3622,27 +3628,27 @@ pub fn parser_pretty_printer(tree: &ParseNode, depth: usize) -> String {
             format!("\n{}type: {:?}, punctuator: {:?} :", idt, tree.entry, punc)
         }
         NodeType::ParameterTypeList(has_var_arg_list) => format!(
-            "\n{}type: {:?}, has_var_arg_list: {}, t_exp: {:?}",
-            idt, tree.entry, has_var_arg_list, tree.type_exp
+            "\n{}type: {:?}, has_var_arg_list: {}, t_exp: {}",
+            idt, tree.entry, has_var_arg_list, tree.type_exp.print()
         ),
         NodeType::DirectAbstractDeclaratorBlock(punc) => format!(
-            "\n{}type: {:?}, punctuator: {:?} t_exp: {:?} :",
-            idt, tree.entry, punc, tree.type_exp
+            "\n{}type: {:?}, punctuator: {:?} t_exp: {} :",
+            idt, tree.entry, punc, tree.type_exp.print()
         ),
         NodeType::LabeledStatement(name) => format!(
-            "\n{}type: {:?}, key: {:?} t_exp: {:?} :",
-            idt, tree.entry, name, tree.type_exp
+            "\n{}type: {:?}, key: {:?} t_exp: {} :",
+            idt, tree.entry, name, tree.type_exp.print()
         ),
         NodeType::SelectionStatement(name) => format!(
-            "\n{}type: {:?}, key: {:?} : t_exp: {:?}: ",
-            idt, tree.entry, name, tree.type_exp
+            "\n{}type: {:?}, key: {:?} : t_exp: {}: ",
+            idt, tree.entry, name, tree.type_exp.print()
         ),
         NodeType::IterationStatement(name) => format!(
-            "\n{}type: {:?}, key: {:?} t_exp: {:?}:",
-            idt, tree.entry, name, tree.type_exp
+            "\n{}type: {:?}, key: {:?} t_exp: {}:",
+            idt, tree.entry, name, tree.type_exp.print()
         ),
         NodeType::JumpStatement(name, label) => format!(
-            "\n{}type: {:?} key: {}, label: {} t_exp: {:?}: ",
+            "\n{}type: {:?} key: {}, label: {} t_exp: {}: ",
             idt,
             tree.entry,
             name,
@@ -3650,14 +3656,14 @@ pub fn parser_pretty_printer(tree: &ParseNode, depth: usize) -> String {
                 Some(s) => s,
                 None => "none",
             },
-            tree.type_exp
+            tree.type_exp.print()
         ),
         _ =>
         // format!(""),
         {
             format!(
-                "\n{}type: {:?} t_exp: {:?}:",
-                idt, tree.entry, tree.type_exp
+                "\n{}type: {:?} t_exp: {}:",
+                idt, tree.entry, tree.type_exp.print()
             )
         }
     };

@@ -119,13 +119,38 @@ impl TypeExpression {
         }
     }
     pub fn new_val(s: BaseType) -> TypeExpression {
-        let mut v = Vec::new();
+        let mut v: Vec<BaseType> = Vec::new();
         v.push(s);
         TypeExpression {
             val: v,
             child: Vec::new(),
         }
     }
+
+    pub fn print(&self) -> String {
+        let mut format_str = String::new();
+        if self.val.is_empty() {
+            if self.child.is_empty() {
+                return format_str;
+            }
+            for it in self.child.iter() {
+                format_str.push_str(&(*it).print());
+            }
+        } else {
+            format_str.push_str(&format!(" {:?} ", self.val));
+            if self.child.is_empty() {
+                return format_str;
+            }
+            for it in self.child.iter() {
+                format_str.push_str("{");
+                format_str.push_str(&(*it).print());
+                format_str.push_str("}");
+            }
+        }
+
+        format_str
+    }
+
 }
 
 #[derive(PartialEq, Clone, Debug)]
