@@ -1,4 +1,5 @@
 use crate::lexer;
+use crate::symtable::TypeExpression;
 // ----------------------------------------------------------------------------------------
 #[derive(PartialEq, Clone, Debug)]
 pub enum NodeType {
@@ -97,6 +98,7 @@ pub enum ConstantType {
 pub struct ParseNode {
     pub child: Vec<ParseNode>,
     pub entry: NodeType,
+    pub type_exp: TypeExpression,
 }
 
 impl ParseNode {
@@ -104,6 +106,7 @@ impl ParseNode {
         ParseNode {
             child: Vec::new(),
             entry: s,
+            type_exp: TypeExpression::new(),
         }
     }
 }

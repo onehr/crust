@@ -18,6 +18,7 @@
 
 use crate::ast::{ConstantType, NodeType, ParseNode};
 use crate::lexer;
+use crate::symtable::{BaseType, TypeExpression};
 
 // XXX: How to handle error message properly should be improved later
 //      and some uncommon situations support should be added.
@@ -53,10 +54,9 @@ fn p_identifier(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize
 
     match &toks[pos] {
         lexer::TokType::IDENTIFIER(val) => {
-            return Ok((
-                ParseNode::new(NodeType::Identifier(val.to_string())),
-                pos + 1,
-            ));
+            let mut cur_node = ParseNode::new(NodeType::Identifier(val.to_string()));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Identifier(val.to_string()));
+            return Ok((cur_node, pos + 1));
         }
         _ => {
             return Err(error_handler("identifier", &toks[pos], pos));
@@ -77,22 +77,27 @@ fn p_primary_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNod
 
     let mut cur_node = ParseNode::new(NodeType::PrimaryExpression);
     if let Ok((child_node, new_pos)) = p_identifier(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, new_pos));
     } else if let Ok((child_node, new_pos)) = p_constant(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, new_pos));
     } else if let Ok((child_node, new_pos)) = p_string(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, new_pos));
     } else if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::LParen) {
         let pos = pos + 1;
         let (child_node, pos) = p_expression(toks, pos)?;
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         check_tok(pos, &toks, &lexer::TokType::RParen)?;
         let pos = pos + 1;
         return Ok((cur_node, pos));
     } else if let Ok((child_node, new_pos)) = p_generic_selection(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, new_pos));
     } else {
@@ -110,17 +115,21 @@ fn p_constant(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize),
 
     match &toks[pos] {
         lexer::TokType::IConstant(i_val) => {
-            let cur_node = ParseNode::new(NodeType::Constant(ConstantType::I64(*i_val)));
+            let mut cur_node = ParseNode::new(NodeType::Constant(ConstantType::I64(*i_val)));
+            // cause if the value was assigned to int, we can easily cast long to int.
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Long);
             Ok((cur_node, pos + 1))
         }
         lexer::TokType::FConstant(f_val) => {
-            let cur_node = ParseNode::new(NodeType::Constant(ConstantType::F64(*f_val)));
+            let mut cur_node = ParseNode::new(NodeType::Constant(ConstantType::F64(*f_val)));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Double);
             Ok((cur_node, pos + 1))
         }
         lexer::TokType::EnumerationConstant(e_val) => {
             // XXX: this need to be processed by the lexer maybe
-            let cur_node =
+            let mut cur_node =
                 ParseNode::new(NodeType::Constant(ConstantType::String(e_val.to_string())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Long);
             Ok((cur_node, pos + 1))
         }
         _ => Err(error_handler("constant", &toks[pos], pos)),
@@ -138,7 +147,8 @@ fn p_enumeration_constant(
     check_pos(pos, toks.len())?;
     match &toks[pos] {
         lexer::TokType::IDENTIFIER(name) => {
-            let cur_node = ParseNode::new(NodeType::EnumerationConstant(name.to_string()));
+            let mut cur_node = ParseNode::new(NodeType::EnumerationConstant(name.to_string()));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Identifier(name.to_string()));
             return Ok((cur_node, pos + 1));
         }
         _ => {
@@ -156,12 +166,20 @@ fn p_string(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), S
 
     match &toks[pos] {
         lexer::TokType::StringLiteral(v, _tag) => {
-            let cur_node = ParseNode::new(NodeType::STRING(v.to_string()));
+            let mut cur_node = ParseNode::new(NodeType::STRING(v.to_string()));
+            let len = v.len();
+            let mut t_exp = TypeExpression::new_val(BaseType::Array(len));
+            t_exp.val.push(BaseType::Char);
+            cur_node.type_exp = t_exp;
             return Ok((cur_node, pos + 1));
         }
         lexer::TokType::FuncName => {
-            // FIXME: cause now there's no semantic analyzer, so just pass the
-            let cur_node = ParseNode::new(NodeType::STRING("__func_name__".to_string()));
+            // FIXME: cause now there's no semantic analyzer, so just pass the literal
+            let mut cur_node = ParseNode::new(NodeType::STRING("__func_name__".to_string()));
+            let len = "__func_name__".len();
+            let mut t_exp = TypeExpression::new_val(BaseType::Array(len));
+            t_exp.val.push(BaseType::Char);
+            cur_node.type_exp = t_exp;
             return Ok((cur_node, pos + 1));
         }
         _ => {
@@ -173,6 +191,7 @@ fn p_string(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), S
 // generic_selection
 // 	: GENERIC '(' assignment_expression ',' generic_assoc_list ')'
 // 	;
+// TODO: Add type system for this kind of node
 fn p_generic_selection(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), String> {
     check_pos(pos, toks.len())?;
 
@@ -207,6 +226,7 @@ fn p_generic_selection(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode
 // 	;
 // EBNF:
 // -> generic_association { ',' generic_association }
+// TODO: Add type system for this kind of node
 fn p_generic_assoc_list(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), String> {
     check_pos(pos, toks.len())?;
 
@@ -239,6 +259,7 @@ fn p_generic_assoc_list(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNod
 // generic_association
 // 	: type_name ':' assignment_expression
 // 	| DEFAULT ':' assignment_expression
+// TODO: Add type system for this kind of node
 fn p_generic_association(
     toks: &[lexer::TokType],
     pos: usize,
@@ -296,20 +317,30 @@ fn p_postfix_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNod
     let mut cur_node = ParseNode::new(NodeType::PostfixExpression);
 
     if let Ok((child_node, pos)) = p_primary_expression(toks, pos) {
+        let pre_type = child_node.type_exp.clone();
+
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         let mut pos = pos;
+        let mut inc = 0;
         loop {
             if let Ok((child_node, tmp_pos)) = p_postfix_expression_post(toks, pos) {
+                inc = inc + 1;
                 cur_node.child.push(child_node);
                 pos = tmp_pos;
             } else {
                 break;
             }
         }
+
+        if inc == 0 {
+            cur_node.type_exp = pre_type;
+        }
         return Ok((cur_node, pos));
     } else if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::LParen) {
         let pos = pos + 1;
         let (child_node, pos) = p_type_name(toks, pos)?;
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
 
         check_tok(pos, &toks, &lexer::TokType::RParen)?;
@@ -319,6 +350,7 @@ fn p_postfix_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNod
         let pos = pos + 1;
 
         let (child_node, pos) = p_initializer_list(toks, pos)?;
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::RBrace) {
             let pos = pos + 1;
@@ -326,6 +358,7 @@ fn p_postfix_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNod
             let mut pos = pos;
             loop {
                 if let Ok((child_node, tmp_pos)) = p_postfix_expression_post(toks, pos) {
+                    cur_node.type_exp.child.push(child_node.type_exp.clone());
                     cur_node.child.push(child_node);
                     pos = tmp_pos;
                 } else {
@@ -342,6 +375,7 @@ fn p_postfix_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNod
             let mut pos = pos;
             loop {
                 if let Ok((child_node, tmp_pos)) = p_postfix_expression_post(toks, pos) {
+                    cur_node.type_exp.child.push(child_node.type_exp.clone());
                     cur_node.child.push(child_node);
                     pos = tmp_pos;
                 } else {
@@ -364,6 +398,7 @@ fn p_postfix_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNod
 // 	| IncOp
 // 	| DecOp
 // TODO: Need carefully review
+// TODO: Add type system for this kind of node
 fn p_postfix_expression_post(
     toks: &[lexer::TokType],
     pos: usize,
@@ -375,6 +410,7 @@ fn p_postfix_expression_post(
             let mut cur_node = ParseNode::new(NodeType::PostfixExpressionPost(toks[pos].clone()));
             let pos = pos + 1;
             let (child_node, pos) = p_expression(toks, pos)?;
+            cur_node.type_exp = child_node.type_exp.clone();
             cur_node.child.push(child_node);
             check_tok(pos, &toks, &lexer::TokType::RBracket)?;
             let pos = pos + 1;
@@ -388,6 +424,7 @@ fn p_postfix_expression_post(
                 return Ok((cur_node, pos));
             } else {
                 let (child_node, pos) = p_argument_expression_list(toks, pos)?;
+                cur_node.type_exp = child_node.type_exp.clone();
                 cur_node.child.push(child_node);
                 check_tok(pos, &toks, &lexer::TokType::RParen)?;
                 let pos = pos + 1;
@@ -426,9 +463,12 @@ fn p_argument_expression_list(
     let mut cur_node = ParseNode::new(NodeType::ArgumentExpressionList);
 
     let (child_node, pos) = p_assignment_expression(toks, pos)?; // if error, then out
+    let pre_type = child_node.type_exp.clone();
 
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
 
+    let mut inc = 0;
     let mut pos = pos;
     loop {
         if let Err(_) = check_tok(pos, &toks, &lexer::TokType::Comma) {
@@ -436,6 +476,8 @@ fn p_argument_expression_list(
         }
         match p_assignment_expression(toks, pos + 1) {
             Ok((child_node, tmp)) => {
+                inc = inc + 1;
+                cur_node.type_exp.child.push(child_node.type_exp.clone());
                 cur_node.child.push(child_node);
                 pos = tmp;
             }
@@ -444,6 +486,9 @@ fn p_argument_expression_list(
                 break;
             }
         }
+    }
+    if inc == 0 {
+        cur_node.type_exp = pre_type;
     }
     return Ok((cur_node, pos));
 }
@@ -465,28 +510,34 @@ fn p_unary_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode,
             let mut cur_node = ParseNode::new(NodeType::UnaryExpression(Some(toks[pos].clone())));
             let pos = pos + 1;
             let (child_node, pos) = p_unary_expression(toks, pos)?;
+            cur_node.type_exp = child_node.type_exp.clone();
             cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         }
         lexer::TokType::SIZEOF => {
+            // assign the return type of sizeof() to size_t
             let pos = pos + 1;
             let mut cur_node = ParseNode::new(NodeType::UnaryExpression(Some(toks[pos].clone())));
             if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::LParen) {
                 let (child_node, pos) = p_type_name(toks, pos)?;
+                cur_node.type_exp = TypeExpression::new_val(BaseType::SizeT);
                 cur_node.child.push(child_node);
                 return Ok((cur_node, pos));
             } else {
                 let (child_node, pos) = p_unary_expression(toks, pos)?;
+                cur_node.type_exp = TypeExpression::new_val(BaseType::SizeT);
                 cur_node.child.push(child_node);
                 return Ok((cur_node, pos));
             }
         }
         lexer::TokType::ALIGNOF => {
+            // should return type size_t
             let mut cur_node = ParseNode::new(NodeType::UnaryExpression(Some(toks[pos].clone())));
             let pos = pos + 1;
             if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::LParen) {
                 let pos = pos + 1;
                 let (child_node, pos) = p_type_name(toks, pos)?;
+                cur_node.type_exp = TypeExpression::new_val(BaseType::SizeT);
                 cur_node.child.push(child_node);
                 return Ok((cur_node, pos));
             } else {
@@ -498,12 +549,36 @@ fn p_unary_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode,
             // unary_operator cast_expression
             if let Ok((child_node, pos)) = p_unary_operator(toks, pos) {
                 let mut cur_node = ParseNode::new(NodeType::UnaryExpression(None));
+                let unary_op = if let NodeType::UnaryOperator(op) = child_node.entry.clone() {
+                    op
+                } else {
+                    return Err(format!(
+                        "Syntax: expected unary_operator, got {:?}",
+                        child_node.entry
+                    ));
+                };
+
                 cur_node.child.push(child_node);
                 let (child_node, pos) = p_cast_expression(toks, pos)?;
+                match unary_op {
+                    lexer::TokType::SingleAnd => {
+                        cur_node.type_exp = TypeExpression::new_val(BaseType::Pointer);
+                    }
+                    lexer::TokType::Multi => {
+                        // *(void *) , need to be casted.
+                        let mut t_exp = TypeExpression::new_val(BaseType::Pointer);
+                        t_exp.val.push(BaseType::VoidPointer);
+                        cur_node.type_exp = t_exp;
+                    }
+                    _ => {
+                        cur_node.type_exp = child_node.type_exp.clone();
+                    }
+                }
                 cur_node.child.push(child_node);
                 return Ok((cur_node, pos));
             } else if let Ok((child_node, pos)) = p_postfix_expression(toks, pos) {
                 let mut cur_node = ParseNode::new(NodeType::UnaryExpression(None));
+                cur_node.type_exp = child_node.type_exp.clone();
                 cur_node.child.push(child_node);
                 return Ok((cur_node, pos));
             } else {
@@ -531,6 +606,7 @@ fn p_unary_operator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
         lexer::TokType::Exclamation| // '!'
         lexer::TokType::Tilde |
         lexer::TokType::Plus => {
+            // don't have type, just care about the operator type
             return Ok((ParseNode::new(NodeType::UnaryOperator(toks[pos].clone())), pos + 1));
         }
         _ => {
@@ -544,27 +620,57 @@ fn p_unary_operator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
 // 	| '(' type_name ')' cast_expression
 // 	;
 fn p_cast_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), String> {
+    fn judge_cast(_to_type: &TypeExpression, _from_type: &TypeExpression) -> bool {
+        // TODO: should finish a judge function:
+        //       judge whether can we use type_name to cast the cast_expression
+        //       most situations should raise error, like we can not write (struct) int, etc..
+        //       now just return true
+        return true;
+    }
+
     check_pos(pos, toks.len())?;
 
     let mut cur_node = ParseNode::new(NodeType::CastExpression);
     if let Ok((child_node, pos)) = p_unary_expression(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::LParen) {
         let (child_node, pos) = p_type_name(toks, pos + 1)?;
+        let to_type = child_node.type_exp.clone();
+
         cur_node.child.push(child_node);
 
         check_tok(pos, &toks, &lexer::TokType::RParen)?;
 
         let (child_node, pos) = p_cast_expression(toks, pos)?;
-        cur_node.child.push(child_node);
+        let from_type = child_node.type_exp.clone();
 
+        // TODO: need to judge here, now just cast.
+        if judge_cast(&to_type, &from_type) == false {
+            return Err(format!(
+                "Can not cast from {:?} to {:?}",
+                from_type, to_type
+            ));
+        }
+
+        cur_node.type_exp = to_type;
+        cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
         return Err(format!("Error parse cast_expression"));
     }
 }
 
+fn judge_combine_type(
+    _l_type: &TypeExpression,
+    r_type: &TypeExpression,
+    _op: &lexer::TokType,
+) -> (bool, TypeExpression) {
+    // TODO: now just return true and the r_type
+    //       need to judge whether we can combine two types and return the new type.
+    return (true, r_type.clone());
+}
 // multiplicative_expression
 // 	: cast_expression
 // 	| multiplicative_expression '*' cast_expression
@@ -581,12 +687,14 @@ fn p_multiplicative_expression(
     // exp -> multiplicative_expression
     let mut pos = pos;
     let (child_node, tmp_pos) = p_cast_expression(toks, pos)?;
+    let mut l_type = child_node.type_exp.clone();
     pos = tmp_pos;
     let mut tok = &toks[pos];
     if *tok != lexer::TokType::Mod
         && *tok != lexer::TokType::Multi
         && *tok != lexer::TokType::Splash
     {
+        cur_node.type_exp = l_type;
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     }
@@ -599,13 +707,26 @@ fn p_multiplicative_expression(
     {
         let mut bincur_node = ParseNode::new(NodeType::BinaryExpression(tok.clone()));
         pos = pos + 1;
+        let op = tok.clone();
         let (next_child_node, tmp_pos) = p_cast_expression(toks, pos)?;
+        let r_type = next_child_node.type_exp.clone();
+
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
+        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+            bincur_node.type_exp = combine_type;
+        } else {
+            return Err(format!(
+                "can not use type: {:?} to {:?} type {:?}, ",
+                l_type, op, r_type
+            ));
+        }
         child_node = bincur_node;
+        l_type = child_node.type_exp.clone();
         tok = &toks[pos];
     }
+    cur_node.type_exp = child_node.type_exp.clone();
     cur_node.child.push(child_node);
     return Ok((cur_node, pos));
 }
@@ -622,9 +743,11 @@ fn p_additive_expression(
     // exp -> multiplicative_expression
     let mut pos = pos;
     let (child_node, tmp_pos) = p_multiplicative_expression(toks, pos)?;
+    let mut l_type = child_node.type_exp.clone();
     pos = tmp_pos;
     let mut tok = &toks[pos];
     if *tok != lexer::TokType::Plus && *tok != lexer::TokType::Minus {
+        cur_node.type_exp = l_type;
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     }
@@ -635,13 +758,25 @@ fn p_additive_expression(
     while *tok == lexer::TokType::Plus || *tok == lexer::TokType::Minus {
         let mut bincur_node = ParseNode::new(NodeType::BinaryExpression(tok.clone()));
         pos = pos + 1;
+        let op = tok.clone();
         let (next_child_node, tmp_pos) = p_multiplicative_expression(toks, pos)?;
+        let r_type = next_child_node.type_exp.clone();
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
+        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+            bincur_node.type_exp = combine_type;
+        } else {
+            return Err(format!(
+                "can not use type: {:?} to {:?} type {:?}, ",
+                l_type, op, r_type
+            ));
+        }
         child_node = bincur_node;
+        l_type = child_node.type_exp.clone();
         tok = &toks[pos];
     }
+    cur_node.type_exp = child_node.type_exp.clone();
     cur_node.child.push(child_node);
     return Ok((cur_node, pos));
 }
@@ -657,8 +792,10 @@ fn p_shift_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode,
     let mut cur_node = ParseNode::new(NodeType::ShiftExpression);
     // exp -> additive_expression
     let (child_node, pos) = p_additive_expression(toks, pos)?;
+    let mut l_type = child_node.type_exp.clone();
     let mut tok = &toks[pos];
     if *tok != lexer::TokType::LeftOp && *tok != lexer::TokType::RightOp {
+        cur_node.type_exp = l_type;
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     }
@@ -669,13 +806,25 @@ fn p_shift_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode,
     while *tok == lexer::TokType::LeftOp || *tok == lexer::TokType::RightOp {
         let mut bincur_node = ParseNode::new(NodeType::BinaryExpression(tok.clone()));
         pos = pos + 1;
+        let op = tok.clone();
         let (next_child_node, tmp_pos) = p_additive_expression(toks, pos)?;
+        let r_type = next_child_node.type_exp.clone();
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
+        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+            bincur_node.type_exp = combine_type;
+        } else {
+            return Err(format!(
+                "can not use type: {:?} to {:?} type {:?}, ",
+                l_type, op, r_type
+            ));
+        }
         child_node = bincur_node;
+        l_type = child_node.type_exp.clone();
         tok = &toks[pos];
     }
+    cur_node.type_exp = child_node.type_exp.clone();
     cur_node.child.push(child_node);
     return Ok((cur_node, pos));
 }
@@ -687,7 +836,6 @@ fn p_shift_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode,
 // 	| relational_expression GeOp shift_expression
 // 	;
 // -> shift_expression { ('<' | '>' | LeOp | GeOp) shift_expression }
-// XXX:
 fn p_relational_expression(
     toks: &[lexer::TokType],
     pos: usize,
@@ -697,12 +845,14 @@ fn p_relational_expression(
     let mut cur_node = ParseNode::new(NodeType::RelationalExpression);
     // exp -> shift_expression
     let (child_node, pos) = p_shift_expression(toks, pos)?;
+    let mut l_type = child_node.type_exp.clone();
     let mut tok = &toks[pos];
     if *tok != lexer::TokType::Lt
         && *tok != lexer::TokType::Gt
         && *tok != lexer::TokType::GeOp
         && *tok != lexer::TokType::LeOp
     {
+        cur_node.type_exp = l_type;
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     }
@@ -716,13 +866,25 @@ fn p_relational_expression(
     {
         let mut bincur_node = ParseNode::new(NodeType::BinaryExpression(tok.clone()));
         pos = pos + 1;
+        let op = tok.clone();
         let (next_child_node, tmp_pos) = p_shift_expression(toks, pos)?;
+        let r_type = next_child_node.type_exp.clone();
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
+        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+            bincur_node.type_exp = combine_type;
+        } else {
+            return Err(format!(
+                "can not use type: {:?} to {:?} type {:?}, ",
+                l_type, op, r_type
+            ));
+        }
         child_node = bincur_node;
+        l_type = child_node.type_exp.clone();
         tok = &toks[pos];
     }
+    cur_node.type_exp = child_node.type_exp.clone();
     cur_node.child.push(child_node);
     return Ok((cur_node, pos));
 }
@@ -742,8 +904,10 @@ fn p_equality_expression(
     let mut cur_node = ParseNode::new(NodeType::EqualityExpression);
     // exp -> relational_expression
     let (child_node, pos) = p_relational_expression(toks, pos)?;
+    let mut l_type = child_node.type_exp.clone();
     let mut tok = &toks[pos];
     if *tok != lexer::TokType::EqOp && *tok != lexer::TokType::NeOp {
+        cur_node.type_exp = l_type;
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     }
@@ -753,13 +917,25 @@ fn p_equality_expression(
     while *tok == lexer::TokType::EqOp || *tok == lexer::TokType::NeOp {
         let mut bincur_node = ParseNode::new(NodeType::BinaryExpression(tok.clone()));
         pos = pos + 1;
+        let op = tok.clone();
         let (next_child_node, tmp_pos) = p_relational_expression(toks, pos)?;
+        let r_type = next_child_node.type_exp.clone();
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
+        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+            bincur_node.type_exp = combine_type;
+        } else {
+            return Err(format!(
+                "can not use type: {:?} to {:?} type {:?}, ",
+                l_type, op, r_type
+            ));
+        }
         child_node = bincur_node;
+        l_type = child_node.type_exp.clone();
         tok = &toks[pos];
     }
+    cur_node.type_exp = child_node.type_exp.clone();
     cur_node.child.push(child_node);
     return Ok((cur_node, pos));
 }
@@ -776,8 +952,10 @@ fn p_and_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
     let mut cur_node = ParseNode::new(NodeType::AndExpression);
     // exp -> equality_expression
     let (child_node, pos) = p_equality_expression(toks, pos)?;
+    let mut l_type = child_node.type_exp.clone();
     let mut tok = &toks[pos];
     if *tok != lexer::TokType::SingleAnd {
+        cur_node.type_exp = l_type;
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     }
@@ -787,13 +965,25 @@ fn p_and_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
     while *tok == lexer::TokType::SingleAnd {
         let mut bincur_node = ParseNode::new(NodeType::BinaryExpression(tok.clone()));
         pos = pos + 1;
+        let op = tok.clone();
         let (next_child_node, tmp_pos) = p_equality_expression(toks, pos)?;
+        let r_type = next_child_node.type_exp.clone();
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
+        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+            bincur_node.type_exp = combine_type;
+        } else {
+            return Err(format!(
+                "can not use type: {:?} to {:?} type {:?}, ",
+                l_type, op, r_type
+            ));
+        }
         child_node = bincur_node;
+        l_type = child_node.type_exp.clone();
         tok = &toks[pos];
     }
+    cur_node.type_exp = child_node.type_exp.clone();
     cur_node.child.push(child_node);
     return Ok((cur_node, pos));
 }
@@ -812,8 +1002,10 @@ fn p_exclusive_or_expression(
     let mut cur_node = ParseNode::new(NodeType::ExclusiveOrExpression);
     // exp -> and_expression
     let (child_node, pos) = p_and_expression(toks, pos)?;
+    let mut l_type = child_node.type_exp.clone();
     let mut tok = &toks[pos];
     if *tok != lexer::TokType::ExclusiveOr {
+        cur_node.type_exp = l_type;
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     }
@@ -823,13 +1015,25 @@ fn p_exclusive_or_expression(
     while *tok == lexer::TokType::ExclusiveOr {
         let mut bincur_node = ParseNode::new(NodeType::BinaryExpression(tok.clone()));
         pos = pos + 1;
+        let op = tok.clone();
         let (next_child_node, tmp_pos) = p_and_expression(toks, pos)?;
+        let r_type = next_child_node.type_exp.clone();
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
+        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+            bincur_node.type_exp = combine_type;
+        } else {
+            return Err(format!(
+                "can not use type: {:?} to {:?} type {:?}, ",
+                l_type, op, r_type
+            ));
+        }
         child_node = bincur_node;
+        l_type = child_node.type_exp.clone();
         tok = &toks[pos];
     }
+    cur_node.type_exp = child_node.type_exp.clone();
     cur_node.child.push(child_node);
     return Ok((cur_node, pos));
 }
@@ -848,8 +1052,10 @@ fn p_inclusive_or_expression(
     let mut cur_node = ParseNode::new(NodeType::InclusiveOrExpression);
     // exp -> exclusive_or_expression
     let (child_node, pos) = p_exclusive_or_expression(toks, pos)?;
+    let mut l_type = child_node.type_exp.clone();
     let mut tok = &toks[pos];
     if *tok != lexer::TokType::InclusiveOr {
+        cur_node.type_exp = l_type;
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     }
@@ -859,13 +1065,25 @@ fn p_inclusive_or_expression(
     while *tok == lexer::TokType::InclusiveOr {
         let mut bincur_node = ParseNode::new(NodeType::BinaryExpression(tok.clone()));
         pos = pos + 1;
+        let op = tok.clone();
         let (next_child_node, tmp_pos) = p_exclusive_or_expression(toks, pos)?;
+        let r_type = next_child_node.type_exp.clone();
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
+        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+            bincur_node.type_exp = combine_type;
+        } else {
+            return Err(format!(
+                "can not use type: {:?} to {:?} type {:?}, ",
+                l_type, op, r_type
+            ));
+        }
         child_node = bincur_node;
+        l_type = child_node.type_exp.clone();
         tok = &toks[pos];
     }
+    cur_node.type_exp = child_node.type_exp.clone();
     cur_node.child.push(child_node);
     return Ok((cur_node, pos));
 }
@@ -884,8 +1102,10 @@ fn p_logical_and_expression(
     let mut cur_node = ParseNode::new(NodeType::LogicalAndExpression);
     // exp -> inclusive_or_expression
     let (child_node, pos) = p_inclusive_or_expression(toks, pos)?;
+    let mut l_type = child_node.type_exp.clone();
     let mut tok = &toks[pos];
     if *tok != lexer::TokType::AndOp {
+        cur_node.type_exp = l_type;
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     }
@@ -895,13 +1115,25 @@ fn p_logical_and_expression(
     while *tok == lexer::TokType::AndOp {
         let mut bincur_node = ParseNode::new(NodeType::BinaryExpression(tok.clone()));
         pos = pos + 1;
+        let op = tok.clone();
         let (next_child_node, tmp_pos) = p_inclusive_or_expression(toks, pos)?;
+        let r_type = next_child_node.type_exp.clone();
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
+        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+            bincur_node.type_exp = combine_type;
+        } else {
+            return Err(format!(
+                "can not use type: {:?} to {:?} type {:?}, ",
+                l_type, op, r_type
+            ));
+        }
         child_node = bincur_node;
+        l_type = child_node.type_exp.clone();
         tok = &toks[pos];
     }
+    cur_node.type_exp = child_node.type_exp.clone();
     cur_node.child.push(child_node);
     return Ok((cur_node, pos));
 }
@@ -920,8 +1152,10 @@ fn p_logical_or_expression(
     let mut cur_node = ParseNode::new(NodeType::LogicalOrExpression);
     // exp -> logical_and_expression
     let (child_node, pos) = p_logical_and_expression(toks, pos)?;
+    let mut l_type = child_node.type_exp.clone();
     let mut tok = &toks[pos];
     if *tok != lexer::TokType::OrOp {
+        cur_node.type_exp = l_type;
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     }
@@ -931,15 +1165,32 @@ fn p_logical_or_expression(
     while *tok == lexer::TokType::OrOp {
         let mut bincur_node = ParseNode::new(NodeType::BinaryExpression(tok.clone()));
         pos = pos + 1;
+        let op = tok.clone();
         let (next_child_node, tmp_pos) = p_logical_and_expression(toks, pos)?;
+        let r_type = next_child_node.type_exp.clone();
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
+        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+            bincur_node.type_exp = combine_type;
+        } else {
+            return Err(format!(
+                "can not use type: {:?} to {:?} type {:?}, ",
+                l_type, op, r_type
+            ));
+        }
         child_node = bincur_node;
+        l_type = child_node.type_exp.clone();
         tok = &toks[pos];
     }
+    cur_node.type_exp = child_node.type_exp.clone();
     cur_node.child.push(child_node);
     return Ok((cur_node, pos));
+}
+
+fn judge_type_same(_l_type: &TypeExpression, _r_type: &TypeExpression) -> bool {
+    // TODO: now just return true
+    return true;
 }
 // conditional_expression
 // 	: logical_or_expression
@@ -949,21 +1200,65 @@ fn p_conditional_expression(
     toks: &[lexer::TokType],
     pos: usize,
 ) -> Result<(ParseNode, usize), String> {
+    // XXX: should make sure expression and conditional_expression are the same type.
+    //      the final conditional expression type would be expression type,
+    //      and also have to make sure logical_or_expression can be converted to int or bool
+
     check_pos(pos, toks.len())?;
 
     let mut cur_node = ParseNode::new(NodeType::ConditionalExpression);
     if let Ok((child_node, pos)) = p_logical_or_expression(toks, pos) {
-        cur_node.child.push(child_node);
+        cur_node.type_exp = child_node.type_exp.clone();
         if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::QuestionMark) {
+            // first judge logical_or_expression is IConstant.
+            if judge_type_same(
+                &child_node.type_exp,
+                &TypeExpression::new_val(BaseType::Int),
+            ) || judge_type_same(
+                &child_node.type_exp,
+                &TypeExpression::new_val(BaseType::Bool),
+            ) || judge_type_same(
+                &child_node.type_exp,
+                &TypeExpression::new_val(BaseType::Long),
+            ) || judge_type_same(
+                &child_node.type_exp,
+                &TypeExpression::new_val(BaseType::Signed),
+            ) || judge_type_same(
+                &child_node.type_exp,
+                &TypeExpression::new_val(BaseType::Unsigned),
+            ) || judge_type_same(
+                &child_node.type_exp,
+                &TypeExpression::new_val(BaseType::Char),
+            ) {
+
+            } else {
+                return Err(format!(
+                    "Conditional Expression doesn't have logical expression"
+                ));
+            }
+            cur_node.child.push(child_node);
             let pos = pos + 1;
             let (child_node, pos) = p_expression(toks, pos)?;
+            let l_type = child_node.type_exp.clone();
+
             cur_node.child.push(child_node);
             check_tok(pos, &toks, &lexer::TokType::Colon)?;
             let pos = pos + 1;
             let (child_node, pos) = p_conditional_expression(toks, pos)?;
+            let r_type = child_node.type_exp.clone();
+
+            // TODO: actually they don't need to have same type, but need to be able to convert to the same type.
+            //       which is the type of the left side of assignment.
+            if judge_type_same(&l_type, &r_type) == false {
+                return Err(format!(
+                    "Two option expression in Teneray Expression has different type"
+                ));
+            }
+            cur_node.type_exp = child_node.type_exp.clone();
             cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         } else {
+            cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         }
     } else {
@@ -975,6 +1270,16 @@ fn p_conditional_expression(
 // 	: conditional_expression
 // 	| unary_expression assignment_operator assignment_expression
 // 	;
+
+fn implicit_type_cast(
+    l_type: &TypeExpression,
+    r_type: &TypeExpression,
+) -> Result<TypeExpression, String> {
+    // TODO: implicit convert r_type to l_type, if able then return TypeExpression,
+    //       else return Err. Now just simply return l_type.
+    return Ok(l_type.clone());
+}
+
 fn p_assignment_expression(
     toks: &[lexer::TokType],
     pos: usize,
@@ -984,26 +1289,34 @@ fn p_assignment_expression(
     if let Ok((child_node1, pos1)) = p_unary_expression(toks, pos) {
         if let Ok((child_node2, pos2)) = p_assignment_operator(toks, pos1) {
             if let Ok((child_node3, pos3)) = p_assignment_expression(toks, pos2) {
+                let l_type = child_node1.type_exp.clone();
+                let r_type = child_node3.type_exp.clone();
                 cur_node.child.push(child_node1);
                 cur_node.child.push(child_node2);
                 cur_node.child.push(child_node3);
+                let res_type = implicit_type_cast(&l_type, &r_type)?;
+                cur_node.type_exp = res_type.clone();
                 return Ok((cur_node, pos3));
             } else {
                 let (child_node, pos) = p_conditional_expression(toks, pos)?;
+                cur_node.type_exp = child_node.type_exp.clone();
                 cur_node.child.push(child_node);
                 return Ok((cur_node, pos));
             }
         } else {
             let (child_node, pos) = p_conditional_expression(toks, pos)?;
+            cur_node.type_exp = child_node.type_exp.clone();
             cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         }
     } else {
         let (child_node, pos) = p_conditional_expression(toks, pos)?;
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     }
 }
+
 // assignment_operator
 // 	: '='
 // 	| MulAssign
@@ -1045,6 +1358,7 @@ fn p_assignment_operator(
         }
     }
 }
+
 // expression
 // 	: assignment_expression
 // 	| expression ',' assignment_expression
@@ -1056,9 +1370,10 @@ fn p_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize
     let mut cur_node: ParseNode = ParseNode::new(NodeType::Expression);
 
     let (child_node, pos) = p_assignment_expression(toks, pos)?; // if error, then out
-
+    let pre_type = child_node.type_exp.clone();
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
-
+    let mut inc = 0;
     let mut pos: usize = pos;
     loop {
         if let Err(_) = check_tok(pos, &toks, &lexer::TokType::Comma) {
@@ -1069,6 +1384,10 @@ fn p_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize
 
         match p_assignment_expression(toks, pos) {
             Ok((child_node, tmp_pos)) => {
+                inc += 1;
+                // pick the right most assignment_expression's type as its type.
+                // if a = 1,b = 4.0, c = 5, then type should be type(c=5) = int,
+                cur_node.type_exp = child_node.type_exp.clone();
                 cur_node.child.push(child_node);
                 pos = tmp_pos;
             }
@@ -1076,6 +1395,9 @@ fn p_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize
                 break;
             }
         }
+    }
+    if inc == 0 {
+        cur_node.type_exp = pre_type;
     }
     return Ok((cur_node, pos));
 }
@@ -1091,6 +1413,7 @@ fn p_constant_expression(
     let mut cur_node: ParseNode = ParseNode::new(NodeType::ConstantExpression);
 
     let (child_node, pos) = p_conditional_expression(toks, pos)?;
+    cur_node.type_exp = child_node.type_exp.clone();
     cur_node.child.push(child_node);
 
     return Ok((cur_node, pos));
@@ -1104,11 +1427,16 @@ fn p_declaration(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usiz
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::Declaration);
     if let Ok((child_node, pos)) = p_declaration_specifiers(toks, pos) {
-        cur_node.child.push(child_node);
         if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::Semicolon) {
+            cur_node.type_exp = child_node.type_exp.clone();
+            cur_node.child.push(child_node);
             return Ok((cur_node, pos + 1));
         } else {
+            cur_node.type_exp.child.push(child_node.type_exp.clone());
+            cur_node.child.push(child_node);
+
             let (child_node, pos) = p_init_declarator_list(toks, pos)?;
+            cur_node.type_exp.child.push(child_node.type_exp.clone());
             cur_node.child.push(child_node);
 
             if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::Semicolon) {
@@ -1119,6 +1447,7 @@ fn p_declaration(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usiz
             }
         }
     } else if let Ok((child_node, pos)) = p_static_assert_declaration(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
@@ -1147,43 +1476,63 @@ fn p_declaration_specifiers(
     let mut cur_node = ParseNode::new(NodeType::DeclarationSpecifiers);
 
     if let Ok((child_node, pos)) = p_storage_class_specifier(toks, pos) {
+        let pre_type = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         if let Ok((child_node, pos)) = p_declaration_specifiers(toks, pos) {
+            cur_node.type_exp.child.push(pre_type);
+            cur_node.type_exp.child.push(child_node.type_exp.clone());
             cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         } else {
+            cur_node.type_exp = pre_type;
             return Ok((cur_node, pos));
         }
     } else if let Ok((child_node, pos)) = p_type_specifier(toks, pos) {
+        let pre_type = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         if let Ok((child_node, pos)) = p_declaration_specifiers(toks, pos) {
+            cur_node.type_exp.child.push(pre_type);
+            cur_node.type_exp.child.push(child_node.type_exp.clone());
             cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         } else {
+            cur_node.type_exp = pre_type;
             return Ok((cur_node, pos));
         }
     } else if let Ok((child_node, pos)) = p_type_qualifier(toks, pos) {
+        let pre_type = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         if let Ok((child_node, pos)) = p_declaration_specifiers(toks, pos) {
+            cur_node.type_exp.child.push(pre_type);
+            cur_node.type_exp.child.push(child_node.type_exp.clone());
             cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         } else {
+            cur_node.type_exp = pre_type;
             return Ok((cur_node, pos));
         }
     } else if let Ok((child_node, pos)) = p_function_specifier(toks, pos) {
+        let pre_type = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         if let Ok((child_node, pos)) = p_declaration_specifiers(toks, pos) {
+            cur_node.type_exp.child.push(pre_type);
+            cur_node.type_exp.child.push(child_node.type_exp.clone());
             cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         } else {
+            cur_node.type_exp = pre_type;
             return Ok((cur_node, pos));
         }
     } else if let Ok((child_node, pos)) = p_alignment_specifier(toks, pos) {
+        let pre_type = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         if let Ok((child_node, pos)) = p_declaration_specifiers(toks, pos) {
+            cur_node.type_exp.child.push(pre_type);
+            cur_node.type_exp.child.push(child_node.type_exp.clone());
             cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         } else {
+            cur_node.type_exp = pre_type;
             return Ok((cur_node, pos));
         }
     } else {
@@ -1206,7 +1555,10 @@ fn p_init_declarator_list(
     let mut cur_node: ParseNode = ParseNode::new(NodeType::InitDeclaratorList);
 
     let (child_node, pos) = p_init_declarator(toks, pos)?; // if error, then out
+    let pre_type = child_node.type_exp.clone();
+    let mut inc = 0;
 
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
 
     let mut pos: usize = pos;
@@ -1219,6 +1571,9 @@ fn p_init_declarator_list(
 
         match p_init_declarator(toks, pos) {
             Ok((child_node, tmp_pos)) => {
+                inc += 1;
+
+                cur_node.type_exp.child.push(child_node.type_exp.clone());
                 cur_node.child.push(child_node);
                 pos = tmp_pos
             }
@@ -1228,6 +1583,11 @@ fn p_init_declarator_list(
             }
         }
     }
+
+    if inc == 0 {
+        cur_node.type_exp = pre_type;
+    }
+
     return Ok((cur_node, pos));
 }
 
@@ -1237,25 +1597,27 @@ fn p_init_declarator_list(
 // 	;
 fn p_init_declarator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), String> {
     check_pos(pos, toks.len())?;
-    if cfg!(feature = "debug") {
-        println!("in init_declarator with {:?} at {}", toks[pos], pos);
-    }
     let mut cur_node = ParseNode::new(NodeType::InitDeclarator);
 
     if let Ok((child_node, pos)) = p_declarator(toks, pos) {
+        let pre_type = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::Assign) {
             let pos = pos + 1;
             let (child_node, pos) = p_initializer(toks, pos)?;
-            cur_node.child.push(child_node);
-            if cfg!(feature = "debug") {
-                println!(
-                    "out p_init_declarator with pos = {} and tok = {:?}",
-                    pos, toks[pos]
-                );
+
+            if judge_type_same(&pre_type, &child_node.type_exp) {
+                // ok
+            } else {
+                return Err(format!("init_declarator, can not assign"));
             }
+
+            cur_node.type_exp = pre_type;
+            cur_node.child.push(child_node);
+
             return Ok((cur_node, pos));
         } else {
+            cur_node.type_exp = pre_type;
             return Ok((cur_node, pos));
         }
     } else {
@@ -1278,13 +1640,32 @@ fn p_storage_class_specifier(
     check_pos(pos, toks.len())?;
 
     match &toks[pos] {
-        lexer::TokType::TYPEDEF
-        | lexer::TokType::EXTERN
-        | lexer::TokType::STATIC
-        | lexer::TokType::ThreadLocal
-        | lexer::TokType::AUTO
-        | lexer::TokType::REGISTER => {
-            let cur_node = ParseNode::new(NodeType::StorageClassSpecifier(toks[pos].clone()));
+        lexer::TokType::TYPEDEF => {
+            return Err(format!("Typedef is not supported in crust now"));
+        }
+        lexer::TokType::EXTERN => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Extern);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::STATIC => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Static);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::ThreadLocal => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::ThreadLocal);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::AUTO => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Auto);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::REGISTER => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Register);
             return Ok((cur_node, pos + 1));
         }
         _ => {
@@ -1313,31 +1694,85 @@ fn p_storage_class_specifier(
 // 	;
 fn p_type_specifier(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), String> {
     match &toks[pos] {
-        lexer::TokType::VOID
-        | lexer::TokType::CHAR
-        | lexer::TokType::SHORT
-        | lexer::TokType::INT
-        | lexer::TokType::LONG
-        | lexer::TokType::FLOAT
-        | lexer::TokType::DOUBLE
-        | lexer::TokType::SIGNED
-        | lexer::TokType::UNSIGNED
-        | lexer::TokType::BOOL
-        | lexer::TokType::COMPLEX
-        | lexer::TokType::IMAGINARY
-        | lexer::TokType::TypedefName => {
-            let cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+        lexer::TokType::VOID => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Void);
             return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::CHAR => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Char);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::SHORT => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Short);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::INT => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Int);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::LONG => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Long);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::FLOAT => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Float);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::DOUBLE => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Double);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::SIGNED => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Signed);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::UNSIGNED => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Unsigned);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::BOOL => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Bool);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::COMPLEX => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Complex);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::IMAGINARY => {
+            let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Imaginary);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::TypedefName => {
+            // XXX: now can not handle typedef
+            return Err(format!("Typedef is not supported in crust now"));
+            // let cur_node = ParseNode::new(NodeType::TypeSpecifier(Some(toks[pos].clone())));
+            // cur_node.type_exp = TypeExpression::new_val(BaseType::Typedef);
+            // return Ok((cur_node, pos + 1));
         }
         _ => {
             let mut cur_node = ParseNode::new(NodeType::TypeSpecifier(None));
             if let Ok((child_node, pos)) = p_atomic_type_specifier(toks, pos) {
+                cur_node.type_exp = child_node.type_exp.clone();
                 cur_node.child.push(child_node);
                 return Ok((cur_node, pos));
             } else if let Ok((child_node, pos)) = p_struct_or_union_specifier(toks, pos) {
+                cur_node.type_exp = child_node.type_exp.clone();
                 cur_node.child.push(child_node);
                 return Ok((cur_node, pos));
             } else if let Ok((child_node, pos)) = p_enum_specifier(toks, pos) {
+                cur_node.type_exp = child_node.type_exp.clone();
                 cur_node.child.push(child_node);
                 return Ok((cur_node, pos));
             } else {
@@ -1359,14 +1794,17 @@ fn p_struct_or_union_specifier(
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::StructOrUnionSpecifier);
     let (child_node, pos) = p_struct_or_union(toks, pos)?;
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
 
     if let Ok((c, pos)) = p_identifier(toks, pos) {
+        cur_node.type_exp.child.push(c.type_exp.clone());
         cur_node.child.push(c);
         if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::LBrace) {
             let pos = pos + 1;
 
             let (child_node, pos) = p_struct_declaration_list(toks, pos)?;
+            cur_node.type_exp.child.push(child_node.type_exp.clone());
             cur_node.child.push(child_node);
             check_tok(pos, &toks, &lexer::TokType::RBrace)?;
             let pos = pos + 1;
@@ -1379,6 +1817,7 @@ fn p_struct_or_union_specifier(
         let pos = pos + 1;
 
         let (c, pos) = p_struct_declaration_list(toks, pos)?;
+        cur_node.type_exp.child.push(c.type_exp.clone());
         cur_node.child.push(c);
 
         check_tok(pos, &toks, &lexer::TokType::RParen)?;
@@ -1395,12 +1834,17 @@ fn p_struct_or_union_specifier(
 fn p_struct_or_union(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), String> {
     check_pos(pos, toks.len())?;
     match &toks[pos] {
-        lexer::TokType::STRUCT | lexer::TokType::UNION => {
-            let pos = pos + 1;
-            return Ok((
-                ParseNode::new(NodeType::StructOrUnion(toks[pos].clone())),
-                pos,
-            ));
+        lexer::TokType::STRUCT => {
+            let mut cur_node = ParseNode::new(NodeType::StructOrUnion(toks[pos].clone()));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Struct);
+
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::UNION => {
+            let mut cur_node = ParseNode::new(NodeType::StructOrUnion(toks[pos].clone()));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Union);
+
+            return Ok((cur_node, pos + 1));
         }
         _ => {
             return Err(error_handler("struct or union", &toks[pos], pos));
@@ -1418,12 +1862,22 @@ fn p_struct_declaration_list(
 ) -> Result<(ParseNode, usize), String> {
     check_pos(pos, toks.len())?;
     let mut cur_node: ParseNode = ParseNode::new(NodeType::StructDeclarationList);
+
     let (child_node, pos) = p_struct_declaration(toks, pos)?;
+    let pre_type = child_node.type_exp.clone();
+    let mut inc = 0;
+
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
     let mut pos: usize = pos;
     while let Ok((child_node, tmp_pos)) = p_struct_declaration(toks, pos) {
+        inc += 1;
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         pos = tmp_pos;
+    }
+    if inc == 0 {
+        cur_node.type_exp = pre_type;
     }
     return Ok((cur_node, pos));
 }
@@ -1436,14 +1890,18 @@ fn p_struct_declaration(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNod
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::StructDeclaration);
     if let Ok((child_node, pos)) = p_specifier_qualifier_list(toks, pos) {
+        let pre_type = child_node.type_exp.clone();
         cur_node.child.push(child_node);
 
         if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::Semicolon) {
             let pos = pos + 1;
+            cur_node.type_exp = pre_type;
             return Ok((cur_node, pos));
         }
 
         let (child_node, pos) = p_struct_declarator_list(toks, pos)?;
+        cur_node.type_exp.child.push(pre_type);
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
 
         if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::Semicolon) {
@@ -1453,6 +1911,7 @@ fn p_struct_declaration(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNod
             return Err(error_handler(";", &toks[pos], pos));
         }
     } else if let Ok((child_node, pos)) = p_static_assert_declaration(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
@@ -1472,19 +1931,27 @@ fn p_specifier_qualifier_list(
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::SpecifierQualifier);
     if let Ok((child_node, pos)) = p_type_specifier(toks, pos) {
+        let pre_type = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         if let Ok((child_node, pos)) = p_specifier_qualifier_list(toks, pos) {
+            cur_node.type_exp.child.push(pre_type);
+            cur_node.type_exp.child.push(child_node.type_exp.clone());
             cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         } else {
+            cur_node.type_exp = pre_type;
             return Ok((cur_node, pos));
         }
     } else if let Ok((child_node, pos)) = p_type_qualifier(toks, pos) {
+        let pre_type = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         if let Ok((child_node, pos)) = p_specifier_qualifier_list(toks, pos) {
+            cur_node.type_exp.child.push(pre_type);
+            cur_node.type_exp.child.push(child_node.type_exp.clone());
             cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         } else {
+            cur_node.type_exp = pre_type;
             return Ok((cur_node, pos));
         }
     } else {
@@ -1505,7 +1972,10 @@ fn p_struct_declarator_list(
     let mut cur_node: ParseNode = ParseNode::new(NodeType::StructDeclaratorList);
 
     let (child_node, pos) = p_struct_declarator(toks, pos)?; // if error, then out
+    let pre_type = child_node.type_exp.clone();
+    let mut inc = 0;
 
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
 
     let mut pos: usize = pos;
@@ -1518,6 +1988,8 @@ fn p_struct_declarator_list(
 
         match p_struct_declarator(toks, pos) {
             Ok((child_node, tmp_pos)) => {
+                inc += 1;
+                cur_node.type_exp.child.push(child_node.type_exp.clone());
                 cur_node.child.push(child_node);
                 pos = tmp_pos
             }
@@ -1526,6 +1998,10 @@ fn p_struct_declarator_list(
                 break;
             }
         }
+    }
+
+    if inc == 0 {
+        cur_node.type_exp = pre_type;
     }
     return Ok((cur_node, pos));
 }
@@ -1540,16 +2016,22 @@ fn p_struct_declarator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode
     if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::Colon) {
         let pos = pos + 1;
         let (child_node, pos) = p_constant_expression(toks, pos)?;
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
         let (child_node, pos) = p_declarator(toks, pos)?;
+        let pre_type = child_node.type_exp.clone();
+
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::Colon) {
             let (child_node, pos) = p_constant_expression(toks, pos)?;
+            cur_node.type_exp.child.push(child_node.type_exp.clone());
             cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         } else {
+            cur_node.type_exp = pre_type;
             return Ok((cur_node, pos));
         }
     }
@@ -1562,7 +2044,7 @@ fn p_struct_declarator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode
 // 	| ENUM IDENTIFIER '{' enumerator_list ',' '}'
 // 	| ENUM IDENTIFIER
 // 	;
-
+// TODO: Add type system
 fn p_enum_specifier(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), String> {
     check_pos(pos, toks.len())?;
     check_tok(pos, &toks, &lexer::TokType::ENUM)?;
@@ -1628,12 +2110,12 @@ fn p_enum_specifier(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
 // 	| enumerator_list ',' enumerator
 // 	;
 //  -> enumerator { ',' enumerator }
-
 fn p_enumerator_list(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), String> {
     check_pos(pos, toks.len())?;
 
     let mut cur_node: ParseNode = ParseNode::new(NodeType::EnumeratorList);
     let (child_node, pos) = p_enumerator(toks, pos)?; // if error, then out
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
     let mut pos: usize = pos;
     loop {
@@ -1645,6 +2127,7 @@ fn p_enumerator_list(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, 
 
         match p_enumerator(toks, pos) {
             Ok((child_node, tmp_pos)) => {
+                cur_node.type_exp.child.push(child_node.type_exp.clone());
                 cur_node.child.push(child_node);
                 pos = tmp_pos
             }
@@ -1665,14 +2148,40 @@ fn p_enumerator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::Enumerator);
     let (child_node, pos) = p_enumeration_constant(toks, pos)?;
+    let pre_type = child_node.type_exp.clone();
     cur_node.child.push(child_node);
 
     if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::Assign) {
+        cur_node.type_exp.child.push(pre_type);
         let pos = pos + 1;
         let (child_node, pos) = p_constant_expression(toks, pos)?;
+        // cause enum is guaranted to be enough to hold `int`, so ignore `char`
+        if judge_type_same(
+            &child_node.type_exp,
+            &TypeExpression::new_val(BaseType::Int),
+        ) || judge_type_same(
+            &child_node.type_exp,
+            &TypeExpression::new_val(BaseType::Bool),
+        ) || judge_type_same(
+            &child_node.type_exp,
+            &TypeExpression::new_val(BaseType::Long),
+        ) || judge_type_same(
+            &child_node.type_exp,
+            &TypeExpression::new_val(BaseType::Signed),
+        ) || judge_type_same(
+            &child_node.type_exp,
+            &TypeExpression::new_val(BaseType::Unsigned),
+        ) {
+            // ok
+        } else {
+            return Err(format!("enumeration_constant can only assign to int"));
+        }
+
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
+        cur_node.type_exp = pre_type;
         return Ok((cur_node, pos));
     }
 }
@@ -1689,11 +2198,13 @@ fn p_atomic_type_specifier(
 
     check_tok(pos, &toks, &lexer::TokType::ATOMIC)?;
     let pos = pos + 1;
+    cur_node.type_exp = TypeExpression::new_val(BaseType::Atomic);
 
     check_tok(pos, &toks, &lexer::TokType::LParen)?;
     let pos = pos + 1;
 
     let (child_node, pos) = p_type_name(toks, pos)?;
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
 
     check_tok(pos, &toks, &lexer::TokType::RParen)?;
@@ -1710,14 +2221,25 @@ fn p_atomic_type_specifier(
 fn p_type_qualifier(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), String> {
     check_pos(pos, toks.len())?;
     match &toks[pos] {
-        lexer::TokType::CONST
-        | lexer::TokType::RESTRICT
-        | lexer::TokType::VOLATILE
-        | lexer::TokType::ATOMIC => {
-            return Ok((
-                ParseNode::new(NodeType::TypeQualifier(toks[pos].clone())),
-                pos + 1,
-            ));
+        lexer::TokType::CONST => {
+            let mut cur_node = ParseNode::new(NodeType::TypeQualifier(toks[pos].clone()));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Const);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::RESTRICT => {
+            let mut cur_node = ParseNode::new(NodeType::TypeQualifier(toks[pos].clone()));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Restrict);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::VOLATILE => {
+            let mut cur_node = ParseNode::new(NodeType::TypeQualifier(toks[pos].clone()));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Volatile);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::ATOMIC => {
+            let mut cur_node = ParseNode::new(NodeType::TypeQualifier(toks[pos].clone()));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Atomic);
+            return Ok((cur_node, pos + 1));
         }
         _ => {
             return Err(error_handler(
@@ -1736,11 +2258,15 @@ fn p_function_specifier(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNod
     check_pos(pos, toks.len())?;
 
     match &toks[pos] {
-        lexer::TokType::INLINE | lexer::TokType::NORETURN => {
-            return Ok((
-                ParseNode::new(NodeType::FunctionSpecifier(toks[pos].clone())),
-                pos + 1,
-            ));
+        lexer::TokType::INLINE => {
+            let mut cur_node = ParseNode::new(NodeType::FunctionSpecifier(toks[pos].clone()));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Inline);
+            return Ok((cur_node, pos + 1));
+        }
+        lexer::TokType::NORETURN => {
+            let mut cur_node = ParseNode::new(NodeType::FunctionSpecifier(toks[pos].clone()));
+            cur_node.type_exp = TypeExpression::new_val(BaseType::Noreturn);
+            return Ok((cur_node, pos + 1));
         }
         _ => {
             return Err(error_handler("[inline, noreturn]", &toks[pos], pos));
@@ -1751,6 +2277,7 @@ fn p_function_specifier(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNod
 // 	: ALIGNAS '(' type_name ')'
 // 	| ALIGNAS '(' constant_expression ')'
 // 	;
+// XXX: now just return type non expression
 fn p_alignment_specifier(
     toks: &[lexer::TokType],
     pos: usize,
@@ -1777,6 +2304,7 @@ fn p_alignment_specifier(
 
     check_tok(pos, &toks, &lexer::TokType::RParen)?;
     let pos = pos + 1;
+    cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
     return Ok((cur_node, pos));
 }
 // declarator
@@ -1787,11 +2315,14 @@ fn p_declarator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::Declarator);
     if let Ok((child_node, pos)) = p_direct_declarator(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else if let Ok((child_node, pos)) = p_pointer(toks, pos) {
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         let (child_node, pos) = p_direct_declarator(toks, pos)?;
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
@@ -1824,12 +2355,17 @@ fn p_direct_declarator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::DirectDeclarator);
     let mut pos = pos;
+
+    let mut pre_type;
+
     if let Ok((child_node, tmp_pos)) = p_identifier(toks, pos) {
+        pre_type = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         pos = tmp_pos;
     } else if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::LParen) {
         let tmp_pos = pos + 1;
         let (child_node, tmp_pos) = p_declarator(toks, tmp_pos)?;
+        pre_type = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         pos = tmp_pos;
     } else {
@@ -1837,12 +2373,16 @@ fn p_direct_declarator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode
     }
 
     if let Ok((child_node, pos)) = p_direct_declarator_post_list(toks, pos) {
+        cur_node.type_exp.child.push(pre_type);
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
+        cur_node.type_exp = pre_type;
         return Ok((cur_node, pos));
     }
 }
+
 // direct_declarator_post_list
 // : direct_declarator_post { direct_declarator_post }
 fn p_direct_declarator_post_list(
@@ -1852,11 +2392,21 @@ fn p_direct_declarator_post_list(
     check_pos(pos, toks.len())?;
     let mut cur_node: ParseNode = ParseNode::new(NodeType::DirectDeclaratorPostList);
     let (child_node, pos) = p_direct_declarator_post(toks, pos)?;
+    let pre_type = child_node.type_exp.clone();
+    let mut inc = 0;
+
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
     let mut pos: usize = pos;
     while let Ok((child_node, tmp_pos)) = p_direct_declarator_post(toks, pos) {
+        inc += 1;
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         pos = tmp_pos;
+    }
+
+    if inc == 0 {
+        cur_node.type_exp = pre_type;
     }
     return Ok((cur_node, pos));
 }
@@ -1888,12 +2438,14 @@ fn p_direct_declarator_post(
                 let pos = pos + 1;
                 return Ok((cur_node, pos));
             } else if let Ok((child_node, pos)) = p_parameter_type_list(toks, pos) {
+                cur_node.type_exp = child_node.type_exp.clone();
                 cur_node.child.push(child_node);
                 check_tok(pos, &toks, &lexer::TokType::RParen)?;
                 let pos = pos + 1;
                 return Ok((cur_node, pos));
             } else {
                 let (child_node, pos) = p_identifier_list(toks, pos)?;
+                cur_node.type_exp = child_node.type_exp.clone();
                 cur_node.child.push(child_node);
                 check_tok(pos, &toks, &lexer::TokType::RParen)?;
                 let pos = pos + 1;
@@ -1908,6 +2460,7 @@ fn p_direct_declarator_post(
                 return Ok((cur_node, pos));
             } else {
                 let (child_node, pos) = p_assignment_expression(toks, pos)?;
+                cur_node.type_exp = child_node.type_exp.clone();
                 cur_node.child.push(child_node);
                 check_tok(pos, &toks, &lexer::TokType::RBracket)?;
                 let pos = pos + 1;
@@ -1929,16 +2482,20 @@ fn p_pointer(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), 
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::Pointer);
     check_tok(pos, &toks, &lexer::TokType::Multi)?;
+    cur_node.type_exp = TypeExpression::new_val(BaseType::Pointer);
     let pos = pos + 1;
     if let Ok((child_node, pos)) = p_type_qualifier_list(toks, pos) {
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         if let Ok((child_node, pos)) = p_pointer(toks, pos) {
+            cur_node.type_exp.child.push(child_node.type_exp.clone());
             cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         } else {
             return Ok((cur_node, pos));
         }
     } else if let Ok((child_node, pos)) = p_pointer(toks, pos) {
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
@@ -1958,9 +2515,11 @@ fn p_type_qualifier_list(
     check_pos(pos, toks.len())?;
     let mut cur_node: ParseNode = ParseNode::new(NodeType::TypeQualifierList);
     let (child_node, pos) = p_type_qualifier(toks, pos)?;
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
     let mut pos: usize = pos;
     while let Ok((child_node, tmp_pos)) = p_type_qualifier(toks, pos) {
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         pos = tmp_pos;
     }
@@ -1977,11 +2536,14 @@ fn p_parameter_type_list(
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::ParameterTypeList(false)); // no extra variable
     let (child_node, pos) = p_parameter_list(toks, pos)?;
+    cur_node.type_exp = child_node.type_exp.clone();
     cur_node.child.push(child_node);
     if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::Comma) {
         let pos = pos + 1;
         check_tok(pos, &toks, &lexer::TokType::ELLIPSIS)?;
         cur_node.entry = NodeType::ParameterTypeList(true);
+        // XXX: VaList in node.type_exp.val
+        cur_node.type_exp.val.push(BaseType::VaList);
         return Ok((cur_node, pos));
     } else {
         return Ok((cur_node, pos));
@@ -1998,6 +2560,7 @@ fn p_parameter_list(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
 
     let mut cur_node: ParseNode = ParseNode::new(NodeType::ParameterList);
     let (child_node, pos) = p_parameter_declaration(toks, pos)?; // if error, then out
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
     let mut pos: usize = pos;
     loop {
@@ -2009,6 +2572,7 @@ fn p_parameter_list(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
 
         match p_parameter_declaration(toks, pos) {
             Ok((child_node, tmp_pos)) => {
+                cur_node.type_exp.child.push(child_node.type_exp.clone());
                 cur_node.child.push(child_node);
                 pos = tmp_pos
             }
@@ -2033,14 +2597,21 @@ fn p_parameter_declaration(
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::ParameterDeclaration);
     let (c, pos) = p_declaration_specifiers(toks, pos)?;
+    let declaration_specifiers_type = c.type_exp.clone();
+
     cur_node.child.push(c);
     if let Ok((c, pos)) = p_declarator(toks, pos) {
+        cur_node.type_exp.child.push(declaration_specifiers_type);
+        cur_node.type_exp.child.push(c.type_exp.clone());
         cur_node.child.push(c);
         return Ok((cur_node, pos));
     } else if let Ok((c, pos)) = p_abstract_declarator(toks, pos) {
+        cur_node.type_exp.child.push(declaration_specifiers_type);
+        cur_node.type_exp.child.push(c.type_exp.clone());
         cur_node.child.push(c);
         return Ok((cur_node, pos));
     } else {
+        cur_node.type_exp = declaration_specifiers_type;
         return Ok((cur_node, pos));
     }
 }
@@ -2055,6 +2626,10 @@ fn p_identifier_list(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, 
 
     let mut cur_node: ParseNode = ParseNode::new(NodeType::IdentifierList);
     let (child_node, pos) = p_identifier(toks, pos)?; // if error, then out
+    let pre_type = child_node.type_exp.clone();
+    let mut inc = 0;
+
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
     let mut pos: usize = pos;
     loop {
@@ -2066,6 +2641,8 @@ fn p_identifier_list(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, 
 
         match p_identifier(toks, pos) {
             Ok((child_node, tmp_pos)) => {
+                inc += 1;
+                cur_node.type_exp.child.push(child_node.type_exp.clone());
                 cur_node.child.push(child_node);
                 pos = tmp_pos
             }
@@ -2074,6 +2651,10 @@ fn p_identifier_list(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, 
                 break;
             }
         }
+    }
+
+    if inc == 0 {
+        cur_node.type_exp = pre_type;
     }
     return Ok((cur_node, pos));
 }
@@ -2085,12 +2666,16 @@ fn p_type_name(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize)
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::TypeName);
     let (child_node, pos) = p_specifier_qualifier_list(toks, pos)?;
+    let specifier_qualifier_list_type = child_node.type_exp.clone();
     cur_node.child.push(child_node);
 
     if let Ok((child_node, pos)) = p_abstract_declarator(toks, pos) {
+        cur_node.type_exp.child.push(specifier_qualifier_list_type);
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
+        cur_node.type_exp = specifier_qualifier_list_type;
         return Ok((cur_node, pos));
     }
 }
@@ -2110,13 +2695,16 @@ fn p_abstract_declarator(
 
     if let Ok((child_node, pos)) = p_pointer(toks, pos) {
         cur_node.child.push(child_node);
+        cur_node.type_exp = TypeExpression::new_val(BaseType::Pointer);
         if let Ok((child_node, pos)) = p_direct_abstract_declarator(toks, pos) {
+            cur_node.type_exp.child.push(child_node.type_exp.clone());
             cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         } else {
             return Ok((cur_node, pos));
         }
     } else if let Ok((child_node, pos)) = p_direct_abstract_declarator(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
@@ -2157,12 +2745,22 @@ fn p_direct_abstract_declarator(
     check_pos(pos, toks.len())?;
     let mut cur_node: ParseNode = ParseNode::new(NodeType::DirectAbstractDeclarator);
     let (child_node, pos) = p_direct_abstract_declarator_block(toks, pos)?;
+    let pre_type = child_node.type_exp.clone();
+    let mut inc = 0;
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
     let mut pos: usize = pos;
     while let Ok((child_node, tmp_pos)) = p_direct_abstract_declarator_block(toks, pos) {
+        inc += 1;
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         pos = tmp_pos;
     }
+
+    if inc == 0 {
+        cur_node.type_exp = pre_type;
+    }
+
     return Ok((cur_node, pos));
 }
 // direct_abstract_declarator_block
@@ -2193,12 +2791,14 @@ fn p_direct_abstract_declarator_block(
                 return Ok((cur_node, pos));
             } else {
                 if let Ok((child_node, pos)) = p_abstract_declarator(toks, pos) {
+                    cur_node.type_exp = child_node.type_exp.clone();
                     cur_node.child.push(child_node);
                     check_tok(pos, &toks, &lexer::TokType::RParen)?;
                     let pos = pos + 1;
                     return Ok((cur_node, pos));
                 } else {
                     let (child_node, pos) = p_parameter_type_list(toks, pos)?;
+                    cur_node.type_exp = child_node.type_exp.clone();
                     cur_node.child.push(child_node);
                     check_tok(pos, &toks, &lexer::TokType::RParen)?;
                     let pos = pos + 1;
@@ -2215,6 +2815,7 @@ fn p_direct_abstract_declarator_block(
                 return Ok((cur_node, pos));
             } else {
                 let (child_node, pos) = p_assignment_expression(toks, pos)?;
+                cur_node.type_exp = child_node.type_exp.clone();
                 cur_node.child.push(child_node);
                 check_tok(pos, &toks, &lexer::TokType::RBracket)?;
                 let pos = pos + 1;
@@ -2235,10 +2836,9 @@ fn p_direct_abstract_declarator_block(
 fn p_initializer(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), String> {
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::Initializer);
-    if cfg!(feature = "debug") {
-        println!("in p_initializer with pos = {}, tok = {:?}", pos, toks[pos]);
-    }
+
     if let Ok((child_node, pos)) = p_assignment_expression(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
@@ -2246,6 +2846,7 @@ fn p_initializer(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usiz
         let pos = pos + 1;
 
         let (child_node, pos) = p_initializer_list(toks, pos)?;
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
 
         if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::Comma) {
@@ -2265,47 +2866,64 @@ fn p_initializer(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usiz
 // 	| initializer_list ',' initializer
 // 	;
 // -> pre {',' pre}
-
+// XXX: designation initializer should get type(initializer) as its type
+//      but need to add judge function to judge whether it's ok to assign
 fn p_initializer_list(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), String> {
     check_pos(pos, toks.len())?;
 
+    let mut pre_type;
+
+    let mut inc = 0;
     let mut cur_node: ParseNode = ParseNode::new(NodeType::InitializerList);
     let mut pos = pos;
     if let Ok((child_node, tmp_pos)) = p_initializer(toks, pos) {
         pos = tmp_pos;
+        pre_type = child_node.type_exp.clone();
         cur_node.child.push(child_node);
     } else if let Ok((child_node, tmp_pos)) = p_designation(toks, pos) {
         pos = tmp_pos;
         cur_node.child.push(child_node);
         let (child_node, tmp_pos) = p_initializer(toks, pos)?;
+        pre_type = child_node.type_exp.clone();
         pos = tmp_pos;
         cur_node.child.push(child_node);
     } else {
         return Err(format!("Error parse initializer_list"));
     }
+    cur_node.type_exp.child.push(pre_type.clone());
+
     loop {
         if let Err(_) = check_tok(pos, &toks, &lexer::TokType::Comma) {
             break;
         } else {
             pos = pos + 1;
         }
-
+        inc = inc + 1;
         if let Ok((child_node, tmp_pos)) = p_initializer(toks, pos) {
+            pre_type = child_node.type_exp.clone();
             cur_node.child.push(child_node);
             pos = tmp_pos;
         } else if let Ok((child_node, tmp_pos)) = p_designation(toks, pos) {
             pos = tmp_pos;
             cur_node.child.push(child_node);
             let (child_node, tmp_pos) = p_initializer(toks, pos)?;
+            pre_type = child_node.type_exp.clone();
             cur_node.child.push(child_node);
             pos = tmp_pos;
         } else {
             pos = pos - 1;
             break;
         }
+        cur_node.type_exp.child.push(pre_type.clone());
     }
+
+    if inc == 0 {
+        cur_node.type_exp = pre_type;
+    }
+
     return Ok((cur_node, pos));
 }
+
 // designation
 // 	: designator_list '='
 // 	;
@@ -2313,6 +2931,7 @@ fn p_designation(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usiz
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::Designation);
     let (child_node, pos) = p_designator_list(toks, pos)?;
+    cur_node.type_exp = child_node.type_exp.clone();
     cur_node.child.push(child_node);
     check_tok(pos, &toks, &lexer::TokType::Assign)?;
     let pos = pos + 1;
@@ -2327,12 +2946,23 @@ fn p_designator_list(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, 
     check_pos(pos, toks.len())?;
     let mut cur_node: ParseNode = ParseNode::new(NodeType::DesignatorList);
     let (child_node, pos) = p_designator(toks, pos)?;
+    let pre_type = child_node.type_exp.clone();
+    let mut inc = 0;
+
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
     let mut pos: usize = pos;
     while let Ok((child_node, tmp_pos)) = p_designator(toks, pos) {
+        inc += 1;
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         pos = tmp_pos;
     }
+
+    if inc == 0 {
+        cur_node.type_exp = pre_type;
+    }
+
     return Ok((cur_node, pos));
 }
 
@@ -2346,6 +2976,7 @@ fn p_designator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize
     if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::LBracket) {
         let pos = pos + 1;
         let (child_node, pos) = p_constant_expression(toks, pos)?;
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         check_tok(pos, &toks, &lexer::TokType::RBracket)?;
         let pos = pos + 1;
@@ -2354,6 +2985,7 @@ fn p_designator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize
         check_tok(pos, &toks, &lexer::TokType::Dot)?;
         let pos = pos + 1;
         let (child_node, pos) = p_identifier(toks, pos)?;
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     }
@@ -2386,6 +3018,7 @@ fn p_static_assert_declaration(
     let pos = pos + 1;
     check_tok(pos, &toks, &lexer::TokType::Semicolon)?;
     let pos = pos + 1;
+    cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
     return Ok((cur_node, pos));
 }
 
@@ -2401,21 +3034,27 @@ fn p_statement(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize)
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::Statement);
     if let Ok((child_node, pos)) = p_labeled_statement(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else if let Ok((child_node, pos)) = p_compound_statement(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else if let Ok((child_node, pos)) = p_expression_statement(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else if let Ok((child_node, pos)) = p_selection_statement(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else if let Ok((child_node, pos)) = p_iteration_statement(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else if let Ok((child_node, pos)) = p_jump_statement(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
@@ -2437,6 +3076,7 @@ fn p_labeled_statement(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode
             check_tok(pos, &toks, &lexer::TokType::Colon)?;
             let pos = pos + 1;
             let (child_node, pos) = p_statement(toks, pos)?;
+            cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
             cur_node.child.push(child_node);
             return Ok((cur_node, pos));
         }
@@ -2449,6 +3089,7 @@ fn p_labeled_statement(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode
             let pos = pos + 1;
             let (child_node, pos) = p_statement(toks, pos)?;
             cur_node.child.push(child_node);
+            cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
             return Ok((cur_node, pos));
         }
         lexer::TokType::DEFAULT => {
@@ -2458,6 +3099,7 @@ fn p_labeled_statement(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode
             let pos = pos + 1;
             let (child_node, pos) = p_statement(toks, pos)?;
             cur_node.child.push(child_node);
+            cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
             return Ok((cur_node, pos));
         }
         _ => {
@@ -2476,6 +3118,7 @@ fn p_compound_statement(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNod
     check_tok(pos, &toks, &lexer::TokType::LBrace)?;
     let pos = pos + 1;
     if let Ok((child_node, pos)) = p_block_item_list(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         check_tok(pos, &toks, &lexer::TokType::RBrace)?;
         let pos = pos + 1;
@@ -2483,6 +3126,7 @@ fn p_compound_statement(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNod
     } else {
         check_tok(pos, &toks, &lexer::TokType::RBrace)?;
         let pos = pos + 1;
+        cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
         return Ok((cur_node, pos));
     }
 }
@@ -2495,11 +3139,20 @@ fn p_block_item_list(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, 
     check_pos(pos, toks.len())?;
     let mut cur_node: ParseNode = ParseNode::new(NodeType::BlockItemList);
     let (child_node, pos) = p_block_item(toks, pos)?;
+    let pre_type = child_node.type_exp.clone();
+    let mut inc = 0;
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
     let mut pos: usize = pos;
     while let Ok((child_node, tmp_pos)) = p_block_item(toks, pos) {
+        inc += 1;
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         pos = tmp_pos;
+    }
+
+    if inc == 0 {
+        cur_node.type_exp = pre_type;
     }
     return Ok((cur_node, pos));
 }
@@ -2512,9 +3165,11 @@ fn p_block_item(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::BlockItem);
     if let Ok((child_node, pos)) = p_declaration(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else if let Ok((child_node, pos)) = p_statement(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
@@ -2534,9 +3189,11 @@ fn p_expression_statement(
     let mut cur_node = ParseNode::new(NodeType::ExpressionStatement);
     if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::Semicolon) {
         let pos = pos + 1;
+        cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
         return Ok((cur_node, pos));
     } else {
         let (child_node, pos) = p_expression(toks, pos)?;
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         check_tok(pos, &toks, &lexer::TokType::Semicolon)?;
         let pos = pos + 1;
@@ -2575,8 +3232,10 @@ fn p_selection_statement(
                 let pos = pos + 1;
                 let (child_node, pos) = p_statement(toks, pos)?;
                 cur_node.child.push(child_node);
+                cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
                 return Ok((cur_node, pos));
             } else {
+                cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
                 return Ok((cur_node, pos));
             }
         }
@@ -2594,6 +3253,7 @@ fn p_selection_statement(
             let (child_node, pos) = p_statement(toks, pos)?;
             cur_node.child.push(child_node);
 
+            cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
             return Ok((cur_node, pos));
         }
         _ => {
@@ -2633,6 +3293,7 @@ fn p_iteration_statement(
             let (child_node, pos) = p_statement(toks, pos)?;
             cur_node.child.push(child_node);
 
+            cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
             return Ok((cur_node, pos));
         }
         lexer::TokType::DO => {
@@ -2656,6 +3317,7 @@ fn p_iteration_statement(
             check_tok(pos, &toks, &lexer::TokType::Semicolon)?;
             let pos = pos + 1;
 
+            cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
             return Ok((cur_node, pos));
         }
         lexer::TokType::FOR => {
@@ -2676,6 +3338,7 @@ fn p_iteration_statement(
                     let pos = pos + 1;
                     let (child_node, pos) = p_statement(toks, pos)?;
                     cur_node.child.push(child_node);
+                    cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
                     return Ok((cur_node, pos));
                 } else {
                     // 	| FOR '(' expression_statement expression_statement expression ')' statement
@@ -2688,6 +3351,7 @@ fn p_iteration_statement(
                     let (child_node, pos) = p_statement(toks, pos)?;
                     cur_node.child.push(child_node);
 
+                    cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
                     return Ok((cur_node, pos));
                 }
             } else if let Ok((child_node, pos)) = p_declaration(toks, pos) {
@@ -2700,6 +3364,7 @@ fn p_iteration_statement(
 
                     let (child_node, pos) = p_statement(toks, pos)?;
                     cur_node.child.push(child_node);
+                    cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
                     return Ok((cur_node, pos));
                 } else {
                     // 	| FOR '(' declaration expression_statement expression ')' statement
@@ -2712,6 +3377,7 @@ fn p_iteration_statement(
                     let (child_node, pos) = p_statement(toks, pos)?;
                     cur_node.child.push(child_node);
 
+                    cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
                     return Ok((cur_node, pos));
                 }
             } else {
@@ -2740,13 +3406,14 @@ fn p_jump_statement(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
             check_pos(pos, toks.len())?;
             match &toks[pos] {
                 lexer::TokType::IDENTIFIER(var) => {
-                    let cur_node = ParseNode::new(NodeType::JumpStatement(
+                    let mut cur_node = ParseNode::new(NodeType::JumpStatement(
                         "goto".to_string(),
                         Some(var.to_string()),
                     ));
                     let pos = pos + 1;
                     check_tok(pos, &toks, &lexer::TokType::Semicolon)?;
                     let pos = pos + 1;
+                    cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
                     return Ok((cur_node, pos));
                 }
                 _ => {
@@ -2755,29 +3422,36 @@ fn p_jump_statement(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
             }
         }
         lexer::TokType::CONTINUE => {
-            let cur_node = ParseNode::new(NodeType::JumpStatement("continue".to_string(), None));
+            let mut cur_node =
+                ParseNode::new(NodeType::JumpStatement("continue".to_string(), None));
             let pos = pos + 1;
             check_tok(pos, &toks, &lexer::TokType::Semicolon)?;
             let pos = pos + 1;
+            cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
             return Ok((cur_node, pos));
         }
         lexer::TokType::BREAK => {
-            let cur_node = ParseNode::new(NodeType::JumpStatement("break".to_string(), None));
+            let mut cur_node = ParseNode::new(NodeType::JumpStatement("break".to_string(), None));
             let pos = pos + 1;
             check_tok(pos, &toks, &lexer::TokType::Semicolon)?;
             let pos = pos + 1;
+            cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
             return Ok((cur_node, pos));
         }
         lexer::TokType::RETURN => {
             let pos = pos + 1;
             if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::Semicolon) {
-                let cur_node = ParseNode::new(NodeType::JumpStatement("return".to_string(), None));
+                // return val, so the type for this statement should be type(val)
+                let mut cur_node =
+                    ParseNode::new(NodeType::JumpStatement("return".to_string(), None));
                 let pos = pos + 1;
+                cur_node.type_exp = TypeExpression::new_val(BaseType::NoneExpression);
                 return Ok((cur_node, pos));
             } else {
                 let mut cur_node =
                     ParseNode::new(NodeType::JumpStatement("return".to_string(), None));
                 let (child_node, pos) = p_expression(toks, pos)?;
+                cur_node.type_exp = child_node.type_exp.clone();
                 cur_node.child.push(child_node);
                 let pos = pos + 1;
                 return Ok((cur_node, pos));
@@ -2804,10 +3478,12 @@ fn p_external_declaration(
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::ExternalDeclaration);
     if let Ok((child_node, pos)) = p_function_definition(toks, pos) {
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
         let (child_node, pos) = p_declaration(toks, pos)?;
+        cur_node.type_exp = child_node.type_exp.clone();
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     }
@@ -2823,18 +3499,29 @@ fn p_function_definition(
 ) -> Result<(ParseNode, usize), String> {
     check_pos(pos, toks.len())?;
     let mut cur_node = ParseNode::new(NodeType::FunctionDefinition);
-    let (child_node, pos) = p_declaration_specifiers(toks, pos)?;
+    cur_node.type_exp = TypeExpression::new_val(BaseType::Function);
 
+    let (child_node, pos) = p_declaration_specifiers(toks, pos)?;
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
+
     let (child_node, pos) = p_declarator(toks, pos)?;
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
+
     if let Ok((child_node, pos)) = p_declaration_list(toks, pos) {
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
+
         let (child_node, pos) = p_compound_statement(toks, pos)?;
+
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     } else {
         let (child_node, pos) = p_compound_statement(toks, pos)?;
+
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         return Ok((cur_node, pos));
     }
@@ -2848,12 +3535,23 @@ fn p_declaration_list(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode,
     check_pos(pos, toks.len())?;
     let mut cur_node: ParseNode = ParseNode::new(NodeType::DeclarationList);
     let (child_node, pos) = p_declaration(toks, pos)?;
+    let pre_type = child_node.type_exp.clone();
+    let mut inc = 0;
+
+    cur_node.type_exp.child.push(child_node.type_exp.clone());
     cur_node.child.push(child_node);
     let mut pos: usize = pos;
     while let Ok((child_node, tmp_pos)) = p_declaration(toks, pos) {
+        inc += 1;
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         pos = tmp_pos;
     }
+
+    if inc == 0 {
+        cur_node.type_exp = pre_type;
+    }
+
     return Ok((cur_node, pos));
 }
 
@@ -2865,13 +3563,13 @@ fn p_declaration_list(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode,
 fn p_translation_unit(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), String> {
     check_pos(pos, toks.len())?;
     let mut cur_node: ParseNode = ParseNode::new(NodeType::TranslationUnit);
-    // cur_node.child.push(child_node);
     let mut pos: usize = pos;
     loop {
         if pos >= toks.len() {
             break;
         }
         let (child_node, tmp_pos) = p_external_declaration(toks, pos)?;
+        cur_node.type_exp.child.push(child_node.type_exp.clone());
         cur_node.child.push(child_node);
         pos = tmp_pos;
     }
@@ -2897,13 +3595,15 @@ pub fn parser_pretty_printer(tree: &ParseNode, depth: usize) -> String {
     }
     let idt = idt;
     let title: String = match &tree.entry {
-        NodeType::BinaryExpression(op) => {
-            format!("\n{}type: {:?}, op: {:?} :", idt, tree.entry, op)
-        }
-        NodeType::Constant(t) => format!("\n{}type: {:?}, type: {:?} :", idt, tree.entry, t),
-        NodeType::EnumerationConstant(s) => {
-            format!("\n{}type: {:?}, name: {:?}", idt, tree.entry, s)
-        }
+        NodeType::BinaryExpression(op) => format!(
+            "\n{}type: {:?}, op: {:?} t_exp: {}:",
+            idt, tree.entry, op, tree.type_exp.print()
+        ),
+        NodeType::Constant(t) => format!("\n{}type: {:?}, type: {:?} :", idt, tree.entry, t,),
+        NodeType::EnumerationConstant(s) => format!(
+            "\n{}type: {:?}, name: {:?}, t_exp {}",
+            idt, tree.entry, s, tree.type_exp.print()
+        ),
         NodeType::Identifier(name) => format!("\n{}type: {:?}, name: {:?}", idt, tree.entry, name),
         NodeType::STRING(val) => format!("\n{}type: {:?}, val: {}", idt, tree.entry, val),
         NodeType::PostfixExpressionPost(punc) => {
@@ -2928,35 +3628,43 @@ pub fn parser_pretty_printer(tree: &ParseNode, depth: usize) -> String {
             format!("\n{}type: {:?}, punctuator: {:?} :", idt, tree.entry, punc)
         }
         NodeType::ParameterTypeList(has_var_arg_list) => format!(
-            "\n{}type: {:?}, has_var_arg_list: {}",
-            idt, tree.entry, has_var_arg_list
+            "\n{}type: {:?}, has_var_arg_list: {}, t_exp: {}",
+            idt, tree.entry, has_var_arg_list, tree.type_exp.print()
         ),
-        NodeType::DirectAbstractDeclaratorBlock(punc) => {
-            format!("\n{}type: {:?}, punctuator: {:?} :", idt, tree.entry, punc)
-        }
-        NodeType::LabeledStatement(name) => {
-            format!("\n{}type: {:?}, key: {:?} :", idt, tree.entry, name)
-        }
-        NodeType::SelectionStatement(name) => {
-            format!("\n{}type: {:?}, key: {:?} :", idt, tree.entry, name)
-        }
-        NodeType::IterationStatement(name) => {
-            format!("\n{}type: {:?}, key: {:?} :", idt, tree.entry, name)
-        }
+        NodeType::DirectAbstractDeclaratorBlock(punc) => format!(
+            "\n{}type: {:?}, punctuator: {:?} t_exp: {} :",
+            idt, tree.entry, punc, tree.type_exp.print()
+        ),
+        NodeType::LabeledStatement(name) => format!(
+            "\n{}type: {:?}, key: {:?} t_exp: {} :",
+            idt, tree.entry, name, tree.type_exp.print()
+        ),
+        NodeType::SelectionStatement(name) => format!(
+            "\n{}type: {:?}, key: {:?} : t_exp: {}: ",
+            idt, tree.entry, name, tree.type_exp.print()
+        ),
+        NodeType::IterationStatement(name) => format!(
+            "\n{}type: {:?}, key: {:?} t_exp: {}:",
+            idt, tree.entry, name, tree.type_exp.print()
+        ),
         NodeType::JumpStatement(name, label) => format!(
-            "\n{}type: {:?} key: {}, label: {}",
+            "\n{}type: {:?} key: {}, label: {} t_exp: {}: ",
             idt,
             tree.entry,
             name,
             match label {
                 Some(s) => s,
                 None => "none",
-            }
+            },
+            tree.type_exp.print()
         ),
         _ =>
         // format!(""),
         {
-            format!("\n{}type: {:?}:", idt, tree.entry)
+            format!(
+                "\n{}type: {:?} t_exp: {}:",
+                idt, tree.entry, tree.type_exp.print()
+            )
         }
     };
     let mut tree_s = "".to_string();

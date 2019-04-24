@@ -15,28 +15,26 @@
 // symtable.rs: symbol table for identifiers.
 // ------------------------------------------------------------------------
 
-use crate::opts::StopStage;
-
-const X86_64_CHAR_BYTES: u64 = 1;
-const X86_64_SHORT_BYTES: u64 = 2;
+const _X86_64_CHAR_BYTES: u64 = 1;
+const _X86_64_SHORT_BYTES: u64 = 2;
 const X86_64_INT_BYTES: u64 = 4;
-const X86_64_LONG_BYTES: u64 = 8;
+const _X86_64_LONG_BYTES: u64 = 8;
 
 const NUM_REG: usize = 16;
 
-const B64_REG_NAMES: [&str; NUM_REG] = [
+const _B64_REG_NAMES: [&str; NUM_REG] = [
     "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "rbp", "rsp", "r8", "r9", "r10", "r11", "r12", "r13",
     "r14", "r15",
 ];
-const B32_REG_NAMES: [&str; NUM_REG] = [
+const _B32_REG_NAMES: [&str; NUM_REG] = [
     "eax", "ebx", "ecx", "edx", "esi", "edi", "ebp", "esp", "r8d", "r9d", "r10d", "r11d", "r12d",
     "r13d", "r14d", "r15d",
 ];
-const B16_REG_NAMES: [&str; NUM_REG] = [
+const _B16_REG_NAMES: [&str; NUM_REG] = [
     "ax", "bx", "cx", "dx", "si", "di", "bp", "sp", "r8w", "r9w", "r10w", "r11w", "r12w", "r13w",
     "r14w", "r15w",
 ];
-const B8_REG_NAMES: [&str; NUM_REG] = [
+const _B8_REG_NAMES: [&str; NUM_REG] = [
     "al", "bl", "cl", "dl", "sil", "dil", "bpl", "spl", "r8b", "r9b", "r10b", "r11b", "r12b",
     "r13b", "r14b", "r15b",
 ];
@@ -59,6 +57,7 @@ impl SymbolRecord {
 #[derive(PartialEq, Clone, Debug)]
 pub enum BaseType {
     Void,
+    VoidPointer,
     Char,
     Short,
     Int,
@@ -67,14 +66,33 @@ pub enum BaseType {
     Double,
     Signed,
     Unsigned,
+    SizeT,
     Bool,
     Complex,
     Imaginary,
     Pointer,
     Function,
-    Array(u64), // len
+    Array(usize), // len
     Struct,
     Union,
+    Identifier(String),
+    VaList,
+
+    Noreturn,
+    Inline,
+
+    Const,
+    Restrict,
+    Volatile,
+    Atomic,
+
+    Static,
+    ThreadLocal,
+    Extern,
+    Register,
+    Auto,
+
+    NoneExpression, // error if assign this
 }
 
 /// struct: TypeExpressionTree
@@ -84,24 +102,55 @@ pub enum BaseType {
 /// In semantics analysis, the semantics checker should build a TypeExpressionTree.
 /// to make type checking
 #[derive(PartialEq, Clone, Debug)]
-pub struct TypeExpression{
-    pub val: Option<BaseType>,
+pub struct TypeExpression {
+    // XXX: cause every node can contains a type that need to combine several kind of
+    //      base type, like *var -> *(void *), string literal -> arr + char
+    pub val: Vec<BaseType>,
     pub child: Vec<TypeExpression>,
 }
 
-impl TypeExpression{
-    pub fn new() -> TypeExpression{
-        TypeExpression{
-            val: None,
+impl TypeExpression {
+    pub fn new() -> TypeExpression {
+        TypeExpression {
+            // should occur when we don't know now what is its type. It may need to
+            // but should be judged by it's parent.
+            val: Vec::new(),
             child: Vec::new(),
         }
     }
-    pub fn new_val(s: BaseType) -> TypeExpression{
-        TypeExpression{
-            val: Some(s.clone()),
+    pub fn new_val(s: BaseType) -> TypeExpression {
+        let mut v: Vec<BaseType> = Vec::new();
+        v.push(s);
+        TypeExpression {
+            val: v,
             child: Vec::new(),
         }
     }
+
+    pub fn print(&self) -> String {
+        let mut format_str = String::new();
+        if self.val.is_empty() {
+            if self.child.is_empty() {
+                return format_str;
+            }
+            for it in self.child.iter() {
+                format_str.push_str(&(*it).print());
+            }
+        } else {
+            format_str.push_str(&format!(" {:?} ", self.val));
+            if self.child.is_empty() {
+                return format_str;
+            }
+            for it in self.child.iter() {
+                format_str.push_str("{");
+                format_str.push_str(&(*it).print());
+                format_str.push_str("}");
+            }
+        }
+
+        format_str
+    }
+
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -116,14 +165,14 @@ pub struct SymbolAttr {
     volatile: bool,              // Asynchronously accessed.
     size: u64,                   // size in bytes.
     boundary: u64,               // alignment in bytes.
-    base_type: TypeExpression,         // base type in source language.
+    base_type: TypeExpression,   // base type in source language.
     n_elements: u64,             // number of elements.
     register: bool,              // whether the value is in register.
     reg: u64,                    // index of the name of register which contains the value.
     base_reg: u64, // index of the name of register used to calculate the symbol's address.
     storage_class: StorageClass, // `local`, `static`, `global`
-    fn_parameter: bool,   // true: a function parameter
-    // loc: SourceLoc// TODO: add source code location
+    fn_parameter: bool, // true: a function parameter
+                   // loc: SourceLoc// TODO: add source code location
 }
 
 impl SymbolAttr {
@@ -141,65 +190,65 @@ impl SymbolAttr {
             fn_parameter: false,
         }
     }
-    pub fn set_volatile(&mut self, val: bool) {
+    pub fn _set_volatile(&mut self, val: bool) {
         self.volatile = val;
     }
-    pub fn set_size(&mut self, val: u64) {
+    pub fn _set_size(&mut self, val: u64) {
         self.size = val;
     }
-    pub fn set_boundary(&mut self, val: u64) {
+    pub fn _set_boundary(&mut self, val: u64) {
         self.boundary = val;
     }
-    pub fn set_base_type(&mut self, val: TypeExpression) {
+    pub fn _set_base_type(&mut self, val: TypeExpression) {
         self.base_type = val.clone();
     }
-    pub fn set_n_elements(&mut self, val: u64) {
+    pub fn _set_n_elements(&mut self, val: u64) {
         self.n_elements = val;
     }
-    pub fn set_register(&mut self, val: bool) {
+    pub fn _set_register(&mut self, val: bool) {
         self.register = val;
     }
-    pub fn set_reg(&mut self, idx: u64) {
+    pub fn _set_reg(&mut self, idx: u64) {
         self.reg = idx;
     }
-    pub fn set_base_reg(&mut self, idx: u64) {
+    pub fn _set_base_reg(&mut self, idx: u64) {
         self.base_reg = idx;
     }
-    pub fn set_storage_class(&mut self, class: StorageClass) {
+    pub fn _set_storage_class(&mut self, class: StorageClass) {
         self.storage_class = class;
     }
-    pub fn set_fn_parameter(&mut self, val: bool) {
+    pub fn _set_fn_parameter(&mut self, val: bool) {
         self.fn_parameter = val;
     }
 
-    pub fn get_volatile(&self) -> bool {
+    pub fn _get_volatile(&self) -> bool {
         self.volatile
     }
-    pub fn get_size(&self) -> u64 {
+    pub fn _get_size(&self) -> u64 {
         self.size
     }
-    pub fn get_boundary(&self) -> u64 {
+    pub fn _get_boundary(&self) -> u64 {
         self.boundary
     }
-    pub fn get_base_type(&self) -> TypeExpression {
+    pub fn _get_base_type(&self) -> TypeExpression {
         self.base_type.clone()
     }
-    pub fn get_n_elements(&self) -> u64 {
+    pub fn _get_n_elements(&self) -> u64 {
         self.n_elements
     }
-    pub fn get_register(&self) -> bool {
+    pub fn _get_register(&self) -> bool {
         self.register
     }
-    pub fn get_reg(&self) -> u64 {
+    pub fn _get_reg(&self) -> u64 {
         self.reg
     }
-    pub fn get_basereg(&self) -> u64 {
+    pub fn _get_basereg(&self) -> u64 {
         self.base_reg
     }
-    pub fn get_storage_class(&self) -> StorageClass {
+    pub fn _get_storage_class(&self) -> StorageClass {
         self.storage_class.clone()
     }
-    pub fn get_fn_parameter(&self) -> bool {
+    pub fn _get_fn_parameter(&self) -> bool {
         self.fn_parameter
     }
 }
