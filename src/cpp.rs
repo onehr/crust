@@ -219,7 +219,6 @@ fn include_headers(input: String, parent: Option<&Path>) -> Result<String, Box<d
                                 res.push_str(include_headers(header_contents, parent)?.as_ref());
                             }
                         }
-
                     }
                     _ => {
                         // just leave other directives to be handled by the directive_handler
@@ -238,7 +237,6 @@ fn include_headers(input: String, parent: Option<&Path>) -> Result<String, Box<d
     return Ok(res);
 }
 
-#[macro_use]
 use lazy_static;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -294,7 +292,6 @@ fn replace(input: String) -> String {
     }
     return res;
 }
-
 
 fn directive_handler(input: String) -> Result<String, Box<dyn error::Error>> {
     // TODO: now only support #define directive
