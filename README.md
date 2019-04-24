@@ -45,8 +45,9 @@ we have already got some contributors now who are interested in building this pr
     - [ ] better ast printer
     - [ ] should be able handle typedef
     - [ ] add more tests for parser
-* Semantics Analyzer (TODO)
-    - [ ] need to add analyzer to track type
+* Semantics Analyzer (working on)
+    - [X] Type system
+    - [ ] Type checker
 * IR generator (TODO)
 * Optimizer (TODO)
 * Assembly code generator (TODO)
