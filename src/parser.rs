@@ -18,6 +18,7 @@
 
 use crate::ast::{ConstantType, NodeType, ParseNode};
 use crate::lexer;
+use crate::sema;
 use crate::symtable::{BaseType, TypeExpression};
 
 // XXX: How to handle error message properly should be improved later
@@ -620,14 +621,6 @@ fn p_unary_operator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
 // 	| '(' type_name ')' cast_expression
 // 	;
 fn p_cast_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize), String> {
-    fn judge_cast(_to_type: &TypeExpression, _from_type: &TypeExpression) -> bool {
-        // TODO: should finish a judge function:
-        //       judge whether can we use type_name to cast the cast_expression
-        //       most situations should raise error, like we can not write (struct) int, etc..
-        //       now just return true
-        return true;
-    }
-
     check_pos(pos, toks.len())?;
 
     let mut cur_node = ParseNode::new(NodeType::CastExpression);
@@ -646,8 +639,7 @@ fn p_cast_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, 
         let (child_node, pos) = p_cast_expression(toks, pos)?;
         let from_type = child_node.type_exp.clone();
 
-        // TODO: need to judge here, now just cast.
-        if judge_cast(&to_type, &from_type) == false {
+        if sema::judge_cast(&to_type, &from_type) == false {
             return Err(format!(
                 "Can not cast from {:?} to {:?}",
                 from_type, to_type
@@ -662,15 +654,6 @@ fn p_cast_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, 
     }
 }
 
-fn judge_combine_type(
-    _l_type: &TypeExpression,
-    r_type: &TypeExpression,
-    _op: &lexer::TokType,
-) -> (bool, TypeExpression) {
-    // TODO: now just return true and the r_type
-    //       need to judge whether we can combine two types and return the new type.
-    return (true, r_type.clone());
-}
 // multiplicative_expression
 // 	: cast_expression
 // 	| multiplicative_expression '*' cast_expression
@@ -714,7 +697,7 @@ fn p_multiplicative_expression(
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
-        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+        if let (true, combine_type) = sema::judge_combine_type(&l_type, &r_type, &op) {
             bincur_node.type_exp = combine_type;
         } else {
             return Err(format!(
@@ -764,7 +747,7 @@ fn p_additive_expression(
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
-        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+        if let (true, combine_type) = sema::judge_combine_type(&l_type, &r_type, &op) {
             bincur_node.type_exp = combine_type;
         } else {
             return Err(format!(
@@ -812,7 +795,7 @@ fn p_shift_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode,
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
-        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+        if let (true, combine_type) = sema::judge_combine_type(&l_type, &r_type, &op) {
             bincur_node.type_exp = combine_type;
         } else {
             return Err(format!(
@@ -872,7 +855,7 @@ fn p_relational_expression(
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
-        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+        if let (true, combine_type) = sema::judge_combine_type(&l_type, &r_type, &op) {
             bincur_node.type_exp = combine_type;
         } else {
             return Err(format!(
@@ -923,7 +906,7 @@ fn p_equality_expression(
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
-        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+        if let (true, combine_type) = sema::judge_combine_type(&l_type, &r_type, &op) {
             bincur_node.type_exp = combine_type;
         } else {
             return Err(format!(
@@ -971,7 +954,7 @@ fn p_and_expression(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, u
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
-        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+        if let (true, combine_type) = sema::judge_combine_type(&l_type, &r_type, &op) {
             bincur_node.type_exp = combine_type;
         } else {
             return Err(format!(
@@ -1021,7 +1004,7 @@ fn p_exclusive_or_expression(
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
-        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+        if let (true, combine_type) = sema::judge_combine_type(&l_type, &r_type, &op) {
             bincur_node.type_exp = combine_type;
         } else {
             return Err(format!(
@@ -1071,7 +1054,7 @@ fn p_inclusive_or_expression(
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
-        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+        if let (true, combine_type) = sema::judge_combine_type(&l_type, &r_type, &op) {
             bincur_node.type_exp = combine_type;
         } else {
             return Err(format!(
@@ -1121,7 +1104,7 @@ fn p_logical_and_expression(
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
-        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+        if let (true, combine_type) = sema::judge_combine_type(&l_type, &r_type, &op) {
             bincur_node.type_exp = combine_type;
         } else {
             return Err(format!(
@@ -1171,7 +1154,7 @@ fn p_logical_or_expression(
         pos = tmp_pos;
         bincur_node.child.push(child_node);
         bincur_node.child.push(next_child_node);
-        if let (true, combine_type) = judge_combine_type(&l_type, &r_type, &op) {
+        if let (true, combine_type) = sema::judge_combine_type(&l_type, &r_type, &op) {
             bincur_node.type_exp = combine_type;
         } else {
             return Err(format!(
@@ -1188,10 +1171,6 @@ fn p_logical_or_expression(
     return Ok((cur_node, pos));
 }
 
-fn judge_type_same(_l_type: &TypeExpression, _r_type: &TypeExpression) -> bool {
-    // TODO: now just return true
-    return true;
-}
 // conditional_expression
 // 	: logical_or_expression
 // 	| logical_or_expression '?' expression ':' conditional_expression
@@ -1211,22 +1190,22 @@ fn p_conditional_expression(
         cur_node.type_exp = child_node.type_exp.clone();
         if let Ok(_) = check_tok(pos, &toks, &lexer::TokType::QuestionMark) {
             // first judge logical_or_expression is IConstant.
-            if judge_type_same(
+            if sema::judge_type_same(
                 &child_node.type_exp,
                 &TypeExpression::new_val(BaseType::Int),
-            ) || judge_type_same(
+            ) || sema::judge_type_same(
                 &child_node.type_exp,
                 &TypeExpression::new_val(BaseType::Bool),
-            ) || judge_type_same(
+            ) || sema::judge_type_same(
                 &child_node.type_exp,
                 &TypeExpression::new_val(BaseType::Long),
-            ) || judge_type_same(
+            ) || sema::judge_type_same(
                 &child_node.type_exp,
                 &TypeExpression::new_val(BaseType::Signed),
-            ) || judge_type_same(
+            ) || sema::judge_type_same(
                 &child_node.type_exp,
                 &TypeExpression::new_val(BaseType::Unsigned),
-            ) || judge_type_same(
+            ) || sema::judge_type_same(
                 &child_node.type_exp,
                 &TypeExpression::new_val(BaseType::Char),
             ) {
@@ -1249,7 +1228,7 @@ fn p_conditional_expression(
 
             // TODO: actually they don't need to have same type, but need to be able to convert to the same type.
             //       which is the type of the left side of assignment.
-            if judge_type_same(&l_type, &r_type) == false {
+            if sema::judge_type_same(&l_type, &r_type) == false {
                 return Err(format!(
                     "Two option expression in Teneray Expression has different type"
                 ));
@@ -1271,15 +1250,6 @@ fn p_conditional_expression(
 // 	| unary_expression assignment_operator assignment_expression
 // 	;
 
-fn implicit_type_cast(
-    l_type: &TypeExpression,
-    r_type: &TypeExpression,
-) -> Result<TypeExpression, String> {
-    // TODO: implicit convert r_type to l_type, if able then return TypeExpression,
-    //       else return Err. Now just simply return l_type.
-    return Ok(l_type.clone());
-}
-
 fn p_assignment_expression(
     toks: &[lexer::TokType],
     pos: usize,
@@ -1294,7 +1264,7 @@ fn p_assignment_expression(
                 cur_node.child.push(child_node1);
                 cur_node.child.push(child_node2);
                 cur_node.child.push(child_node3);
-                let res_type = implicit_type_cast(&l_type, &r_type)?;
+                let res_type = sema::implicit_type_cast(&l_type, &r_type)?;
                 cur_node.type_exp = res_type.clone();
                 return Ok((cur_node, pos3));
             } else {
@@ -1606,7 +1576,7 @@ fn p_init_declarator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, 
             let pos = pos + 1;
             let (child_node, pos) = p_initializer(toks, pos)?;
 
-            if judge_type_same(&pre_type, &child_node.type_exp) {
+            if sema::judge_type_same(&pre_type, &child_node.type_exp) {
                 // ok
             } else {
                 return Err(format!("init_declarator, can not assign"));
@@ -2156,19 +2126,19 @@ fn p_enumerator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode, usize
         let pos = pos + 1;
         let (child_node, pos) = p_constant_expression(toks, pos)?;
         // cause enum is guaranted to be enough to hold `int`, so ignore `char`
-        if judge_type_same(
+        if sema::judge_type_same(
             &child_node.type_exp,
             &TypeExpression::new_val(BaseType::Int),
-        ) || judge_type_same(
+        ) || sema::judge_type_same(
             &child_node.type_exp,
             &TypeExpression::new_val(BaseType::Bool),
-        ) || judge_type_same(
+        ) || sema::judge_type_same(
             &child_node.type_exp,
             &TypeExpression::new_val(BaseType::Long),
-        ) || judge_type_same(
+        ) || sema::judge_type_same(
             &child_node.type_exp,
             &TypeExpression::new_val(BaseType::Signed),
-        ) || judge_type_same(
+        ) || sema::judge_type_same(
             &child_node.type_exp,
             &TypeExpression::new_val(BaseType::Unsigned),
         ) {
@@ -3597,12 +3567,18 @@ pub fn parser_pretty_printer(tree: &ParseNode, depth: usize) -> String {
     let title: String = match &tree.entry {
         NodeType::BinaryExpression(op) => format!(
             "\n{}type: {:?}, op: {:?} t_exp: {}:",
-            idt, tree.entry, op, tree.type_exp.print()
+            idt,
+            tree.entry,
+            op,
+            tree.type_exp.print()
         ),
         NodeType::Constant(t) => format!("\n{}type: {:?}, type: {:?} :", idt, tree.entry, t,),
         NodeType::EnumerationConstant(s) => format!(
             "\n{}type: {:?}, name: {:?}, t_exp {}",
-            idt, tree.entry, s, tree.type_exp.print()
+            idt,
+            tree.entry,
+            s,
+            tree.type_exp.print()
         ),
         NodeType::Identifier(name) => format!("\n{}type: {:?}, name: {:?}", idt, tree.entry, name),
         NodeType::STRING(val) => format!("\n{}type: {:?}, val: {}", idt, tree.entry, val),
@@ -3629,23 +3605,38 @@ pub fn parser_pretty_printer(tree: &ParseNode, depth: usize) -> String {
         }
         NodeType::ParameterTypeList(has_var_arg_list) => format!(
             "\n{}type: {:?}, has_var_arg_list: {}, t_exp: {}",
-            idt, tree.entry, has_var_arg_list, tree.type_exp.print()
+            idt,
+            tree.entry,
+            has_var_arg_list,
+            tree.type_exp.print()
         ),
         NodeType::DirectAbstractDeclaratorBlock(punc) => format!(
             "\n{}type: {:?}, punctuator: {:?} t_exp: {} :",
-            idt, tree.entry, punc, tree.type_exp.print()
+            idt,
+            tree.entry,
+            punc,
+            tree.type_exp.print()
         ),
         NodeType::LabeledStatement(name) => format!(
             "\n{}type: {:?}, key: {:?} t_exp: {} :",
-            idt, tree.entry, name, tree.type_exp.print()
+            idt,
+            tree.entry,
+            name,
+            tree.type_exp.print()
         ),
         NodeType::SelectionStatement(name) => format!(
             "\n{}type: {:?}, key: {:?} : t_exp: {}: ",
-            idt, tree.entry, name, tree.type_exp.print()
+            idt,
+            tree.entry,
+            name,
+            tree.type_exp.print()
         ),
         NodeType::IterationStatement(name) => format!(
             "\n{}type: {:?}, key: {:?} t_exp: {}:",
-            idt, tree.entry, name, tree.type_exp.print()
+            idt,
+            tree.entry,
+            name,
+            tree.type_exp.print()
         ),
         NodeType::JumpStatement(name, label) => format!(
             "\n{}type: {:?} key: {}, label: {} t_exp: {}: ",
@@ -3663,7 +3654,9 @@ pub fn parser_pretty_printer(tree: &ParseNode, depth: usize) -> String {
         {
             format!(
                 "\n{}type: {:?} t_exp: {}:",
-                idt, tree.entry, tree.type_exp.print()
+                idt,
+                tree.entry,
+                tree.type_exp.print()
             )
         }
     };

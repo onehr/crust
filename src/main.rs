@@ -4,6 +4,7 @@ mod cpp;
 mod lexer;
 mod opts;
 mod parser;
+mod sema;
 mod symtable;
 
 use std::{error, fs};
@@ -62,6 +63,9 @@ fn main() -> Result<(), Box<dyn error::Error>> {
             parser::parser_pretty_printer(&root_node, 0)
         )
     }
+
+    // 4. semantics check
+    sema::sema_driver(&root_node, &input_file.display().to_string())?;
 
     if opts.crust_debug_flags().print_filenames() {
         println!("Output file: {}\n", opts.output().display());
