@@ -150,7 +150,6 @@ impl TypeExpression {
 
         format_str
     }
-
 }
 
 #[derive(PartialEq, Clone, Debug)]
