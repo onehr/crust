@@ -153,7 +153,7 @@ impl TypeExpression {
 }
 
 #[derive(PartialEq, Clone, Debug)]
-enum StorageClass {
+pub enum StorageClass {
     Local,
     Static,
     Global,

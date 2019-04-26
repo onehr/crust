@@ -16,3 +16,16 @@ ast = []
 source = []
 token = []
 as = []
+
+[dev-dependencies]
+criterion = "0.2"
+
+[[bench]]
+name = "bench_lexer"
+harness = false
+[[bench]]
+name = "bench_cpp"
+harness = false
+[[bench]]
+name = "bench_parser"
+harness = false

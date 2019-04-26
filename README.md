@@ -50,6 +50,9 @@ we have already got some contributors now who are interested in building this pr
 * Semantics Analyzer (working on)
     - [X] Type system
     - [ ] Type checker
+* Benchmark (working on)
+    - [X] Use [Criterion.rs](https://github.com/bheisler/criterion.rs#quickstart) to do benchmarks.
+    - [ ] Generate more informations from benchmarking.
 * IR generator (TODO)
 * Optimizer (TODO)
 * Assembly code generator (TODO)
@@ -77,6 +80,20 @@ Run:
 ```bash
 $ ./test_dev.sh
 ```
+
+## Benchmark
+(PS. This is pretty time consuming, 
+cause benchmark will do lots of iterations to test different layers' performance.
+
+Might take 20 to 30 minutes until it is finished.
+)
+Run:
+```bash
+$ cargo bench
+```
+
+After it is finished, 
+you can open `target/criterion/report/index.html` in your web browser to see the details of performance.
 
 ## License
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fonehr%2Fcrust.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fonehr%2Fcrust?ref=badge_large)
