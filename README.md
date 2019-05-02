@@ -57,6 +57,7 @@ we have already got some contributors now who are interested in building this pr
 * Optimizer (TODO)
 * Assembly code generator (TODO)
 * Assembler (TODO)
+* Debugger (Working on, in another [repo](https://github.com/onehr/dbrs))
 ## Requirements
 
 You need a valid rust environment, Cargo.
