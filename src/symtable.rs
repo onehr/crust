@@ -198,7 +198,7 @@ impl SymbolAttr {
     pub fn _set_boundary(&mut self, val: u64) {
         self.boundary = val;
     }
-    pub fn _set_base_type(&mut self, val: TypeExpression) {
+    pub fn set_base_type(&mut self, val: TypeExpression) {
         self.base_type = val.clone();
     }
     pub fn _set_n_elements(&mut self, val: u64) {

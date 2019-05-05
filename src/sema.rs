@@ -21,13 +21,15 @@
 //! * declare before use
 //! * argument type should match when calling a function
 // ------------------------------------------------------------------------
-use crate::ast::ParseNode;
+use crate::ast::{NodeType, ParseNode};
 use crate::lexer;
 use crate::symtable;
+use std::collections::HashMap;
+type SymbolTable = HashMap<String, symtable::SymbolRecord>;
 
 pub fn judge_cast(
-    to_type: &symtable::TypeExpression,
-    from_type: &symtable::TypeExpression,
+    _to_type: &symtable::TypeExpression,
+    _from_type: &symtable::TypeExpression,
 ) -> bool {
     // TODO: should finish a judge function:
     //       judge whether can we use type_name to cast the cast_expression
@@ -59,12 +61,86 @@ pub fn judge_type_same(
 
 pub fn implicit_type_cast(
     l_type: &symtable::TypeExpression,
-    r_type: &symtable::TypeExpression,
+    _r_type: &symtable::TypeExpression,
 ) -> Result<symtable::TypeExpression, String> {
     // TODO: implicit convert r_type to l_type, if able then return TypeExpression,
     //       else return Err. Now just simply return l_type.
 
     return Ok(l_type.clone());
+}
+
+fn type_extract(node: &ParseNode, idx: usize) -> Result<symtable::BaseType, String> {
+    let type_exp = &node.type_exp;
+
+    if idx >= type_exp.val.len() {
+        return Err(format!("type extract error, out of val index"));
+    }
+
+    return Ok(type_exp.val.get(idx).unwrap().clone());
+}
+
+/// generate the symbol table from the abstract syntax tree.
+fn sema_check(tree: &ParseNode, env: &SymbolTable) -> Result<SymbolTable, String> {
+    // XXX: whether too many clones will harm the performance of compiler.
+    //      need to benchmark
+    if tree.entry == NodeType::Declaration {
+        // it should have two children, first is type, second is identifier name
+        let mut env = env.clone();
+        // get the type
+        let type_: symtable::TypeExpression;
+        match tree.child.get(0) {
+            // shouldn't occur
+            None => {
+                return Err(format!("No type specifier"));
+            }
+            Some(t) => {
+                // type_ = type_extract(t, 0)?;
+                type_ = t.type_exp.clone();
+            }
+        }
+        // get the identifier
+        let identifier: String;
+        match tree.child.get(1) {
+            None => {
+                return Err(format!("No identifier"));
+            }
+            Some(t) => match type_extract(t, 0) {
+                Ok(symtable::BaseType::Identifier(name)) => {
+                    identifier = name.clone();
+                }
+                Err(msg) => {
+                    return Err(msg);
+                }
+                _ => {
+                    return Err(format!("Not able to extract "));
+                }
+            },
+        }
+
+        println!("try to search the map to find whether it's declared before");
+        println!("env: {:?}", env);
+        match env.get(&identifier) {
+            Some(_) => {
+                println!("got identifier {}", identifier);
+                return Err(format!("Error: re-declare identifier {}", identifier));
+            }
+            None => {}
+        }
+        let mut attr = symtable::SymbolAttr::new();
+        attr.set_base_type(type_);
+        // println!("id: {:?}, attr: {:?}", identifier, attr);
+        let record = symtable::SymbolRecord::new(identifier.clone(), attr);
+        // insert the name - record to env
+        env.insert(identifier, record);
+        // println!("env: {:?}", env);
+        return Ok(env.clone());
+    } else {
+        let mut now_env = env.clone();
+        for it in tree.child.iter() {
+            now_env = sema_check(&it, &now_env)?;
+        }
+        return Ok(now_env.clone());
+    }
 }
 
 /// Semantics analysis driver
@@ -75,6 +151,9 @@ pub fn implicit_type_cast(
 /// # Return
 /// * Ok -> Ok(())
 /// * Err -> Err(msg)
-pub fn sema_driver(tree: &ParseNode, c_src_name: &str) -> Result<(), String> {
+pub fn sema_driver(tree: &ParseNode, _c_src_name: &str) -> Result<(), String> {
+    let env = SymbolTable::new();
+    sema_check(tree, &env)?;
+
     return Ok(());
 }
