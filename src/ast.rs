@@ -1,6 +1,7 @@
 use crate::lexer;
 use crate::symtable::TypeExpression;
 // ----------------------------------------------------------------------------------------
+#[allow(dead_code)]
 #[derive(PartialEq, Clone, Debug)]
 pub enum NodeType {
     BinaryExpression(lexer::TokType),

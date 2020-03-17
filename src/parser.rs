@@ -2326,7 +2326,7 @@ fn p_direct_declarator(toks: &[lexer::TokType], pos: usize) -> Result<(ParseNode
     let mut cur_node = ParseNode::new(NodeType::DirectDeclarator);
     let mut pos = pos;
 
-    let mut pre_type;
+    let pre_type;
 
     if let Ok((child_node, tmp_pos)) = p_identifier(toks, pos) {
         pre_type = child_node.type_exp.clone();

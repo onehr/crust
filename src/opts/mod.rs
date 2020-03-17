@@ -33,7 +33,7 @@ pub struct CrustDebugFlags {
 }
 
 #[derive(structopt::StructOpt, Clone, Copy, Debug)]
-#[structopt(raw(group = "self::arg_groups::stop_stage_conflict_resolver_arg_group()"))]
+#[structopt(group = self::arg_groups::stop_stage_conflict_resolver_arg_group())]
 pub struct StopStage {
     /// Stop after the assembly stage
     #[structopt(group = "stop_stage_conflict_resolver", short = "-c")]
@@ -82,6 +82,7 @@ impl CrustDebugFlags {
     }
 }
 
+#[allow(dead_code)]
 impl StopStage {
     pub fn assemble(&self) -> bool {
         self.assemble

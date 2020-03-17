@@ -5,10 +5,10 @@ authors = ["onehrxn <waharaxn@gmail.com>"]
 edition = "2018"
 
 [dependencies.structopt]
-version = "0.2.15"
+version = "0.3.11"
 
 [dependencies.lazy_static]
-version = "1.3.0"
+version = "1.4.0"
 
 [features]
 debug = []

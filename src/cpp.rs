@@ -253,13 +253,13 @@ fn replace(input: String) -> String {
     let mut res = String::new();
     while let Some(&c) = it.peek() {
         match c {
-            'a'...'z' | 'A'...'Z' | '_' => {
+            'a'..='z' | 'A'..='Z' | '_' => {
                 it.next();
                 let mut id = String::new();
                 id.push(c);
                 while let Some(&tmp) = it.peek() {
                     match tmp {
-                        'a'...'z' | 'A'...'Z' | '0'...'9' | '_' => {
+                        'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => {
                             id.push(tmp);
                             it.next();
                         }
