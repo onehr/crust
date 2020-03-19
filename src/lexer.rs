@@ -593,7 +593,7 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                 result.push(TokType::Comma);
                 it.next();
             }
-            ' ' | '\n' | '\t' | '\r' => {
+            ' ' | '\n' | '\t' | '\r' | '#' => {
                 // skip
                 it.next();
             }

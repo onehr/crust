@@ -4,5 +4,5 @@
 #include "header4.h"
 #include "header/header_1.h"
 int main(void) {
-        printf("%d %d %d %d %d %d\n", a, b, c, d, e, f);
+        printf("%s %d %d %d %d %d %d\n", NAME, a, b, c, d, e, f);
 }

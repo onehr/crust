@@ -13,7 +13,7 @@ inc=0
 
 crust_compile() {
     echo "TEST $inc: parse [$1]"
-    echo "crust parse $1.c -> ast" && ./target/debug/crust $1.c -o $2.s
+    echo "crust parse $1.c -> ast" && ./target/debug/crust $1.c 
 }
 
 echo -e "[${BLUE}test begins${NC}]"

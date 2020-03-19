@@ -75,6 +75,7 @@ pub fn implicit_type_cast(
 /// # Return
 /// * Ok -> Ok(())
 /// * Err -> Err(msg)
+#[allow(dead_code)]
 pub fn sema_driver(_tree: &ParseNode, _c_src_name: &str) -> Result<(), String> {
     return Ok(());
 }

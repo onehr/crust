@@ -37,8 +37,8 @@ we have already got some contributors now who are interested in building this pr
     - [X] comment support `/**/ and //`
     - [X] line concatenation with ` \ `
     - [X] object-like macro expansion
-    - [ ] function-like macro expansion
-    - [ ] should support all directives later
+    - [X] function-like macro expansion
+    - [ ] should support all directives (ifdef, elif, endif, ...)
 - Lexer (working on)
     - [X] lex all c11 keywords
     - [ ] the floating point number and number with postfix should be supported later.
@@ -72,10 +72,7 @@ $ cargo build # use this command to build the project
 ```
 run
 ```shell
-$ cargo run -- -E source_file.c -o output_file.c # generate preprocessed file
-$ cargo run -- --crust-print-source-token source_file.c -o output_file.c # print the token
-$ cargo run -- --crust-print-source-ast source_file.c -o output_file.c # print the ast
-
+$ cargo run [FLAGS] <files> ...
 ```
 
 ## Running Tests

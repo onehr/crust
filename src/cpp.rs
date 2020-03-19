@@ -16,8 +16,25 @@
 // cpp.rs: Simple c preprocessor
 // -----------------------------------------------------------------------------
 
+use lazy_static::lazy_static;
+use log::{debug, error};
+use regex::Regex;
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::{error, fs, path::Path};
+
+#[derive(Debug)]
+struct Macro {
+    replacement: String,
+    params: Vec<String>,
+}
+lazy_static! {
+    static ref MACROS: Mutex<HashMap<String, Macro>> = {
+        let m = HashMap::new();
+        Mutex::new(m)
+    };
+}
 
 fn trigraph_processor(input: String) -> Result<String, String> {
     // Trigraph:       ??(  ??)  ??<  ??>  ??=  ??/  ??'  ??!  ??-
@@ -236,17 +253,6 @@ fn include_headers(input: String, parent: Option<&Path>) -> Result<String, Box<d
     return Ok(res);
 }
 
-use lazy_static;
-use std::collections::HashMap;
-use std::sync::Mutex;
-
-lazy_static::lazy_static! {
-    static ref DEFINE_OBJ: Mutex<HashMap<String, String>> = {
-        let m = HashMap::new();
-        Mutex::new(m)
-    };
-}
-
 fn replace(input: String) -> String {
     // This is a function, which replace the string if contains defined identifier.
     let mut it = input.chars().peekable();
@@ -269,12 +275,39 @@ fn replace(input: String) -> String {
                     }
                 }
                 let mut get_val = String::new();
-                match DEFINE_OBJ.lock().unwrap().get(&id) {
+                match MACROS.lock().unwrap().get(&id) {
                     Some(s) => {
                         // XXX: I use this method to get rid of deadlock.
                         //      cause call replace function in this scope will cause the
-                        //      child function to lock the DEFINE_OBJ, which is locked here.
-                        get_val.push_str(s);
+                        //      child function to lock the MACROS, which is locked here.
+
+                        let mut replacement = s.replacement.clone();
+                        if !s.params.is_empty() {
+                            let re_args: Regex =
+                                Regex::new(&format!(r"{}\(([^)]+)\)", id)).unwrap();
+
+                            if re_args.is_match(&input) {
+                                let caps = re_args.captures(&input).unwrap();
+                                let matched = caps[0].to_string();
+                                let all_args = caps[1].to_string();
+                                let args: Vec<&str> = all_args.split(",").collect();
+                                if args.len() != s.params.len() {
+                                    error!("Not matched with macro arguments{:?}", id);
+                                }
+
+                                for (i, p) in s.params.iter().enumerate() {
+                                    replacement = replacement.replace(p, args[i]);
+                                }
+
+                                // Skip matched text
+                                for _ in 0..matched.len() - id.len() {
+                                    it.next();
+                                }
+                            } else {
+                                error!("Unable to find macro's parameter, {:?}", id);
+                            }
+                        }
+                        get_val.push_str(&replacement);
                     }
                     None => {
                         res.push_str(&id);
@@ -296,47 +329,59 @@ fn directive_handler(input: String) -> Result<String, Box<dyn error::Error>> {
     // TODO: now only support #define directive
     let mut res = String::new();
 
-    for line in input.lines() {
-        if line.trim_start().is_empty() {
-            // empty line
-            res.push_str("\n");
-            continue;
-        }
-        match char::from(line.trim_start().as_bytes()[0]) {
-            '#' => {
-                let a: Vec<&str> = line.split_whitespace().collect();
-                let directive = *a.get(0).unwrap();
-                match directive {
-                    "#define" => {
-                        // TODO: now only support object-like macros
-                        //       macro names must identifier
-                        // remove this line and handle #define
-                        let name = String::from(*a.get(1).unwrap());
-                        let mut idx = 2;
-                        let mut replace_str = "".to_string();
-                        // cause split_whitespace() split the replace string apart, now need to combine them
-                        while idx < a.len() {
-                            replace_str.push_str(*a.get(idx).unwrap());
-                            idx += 1;
-                            if idx != a.len() {
-                                replace_str = replace_str + " ";
-                            }
+    let mut lines = input.lines();
+    loop {
+        let iter = lines.next();
+        match iter {
+            Some(line) => {
+                if line.trim_start().is_empty() {
+                    // empty line
+                    res.push_str("\n");
+                    continue;
+                }
+                match char::from(line.trim_start().as_bytes()[0]) {
+                    '#' => {
+                        lazy_static! {
+                            static ref RE_MACRO: Regex = Regex::new(
+                                r"^[ \t]*#define[ \t]+([A-Za-z0-9_]+)(\(.*\))?[ \t]*((?:.*\\\r?\n)*.*)"
+                            )
+                            .unwrap();
                         }
-                        let replace_str = replace(replace_str);
-                        DEFINE_OBJ.lock().unwrap().insert(name, replace_str);
+                        if RE_MACRO.is_match(line) {
+                            let caps = RE_MACRO.captures(line).unwrap();
+                            let name = caps[1].to_string();
+                            let params = caps
+                                .get(2)
+                                .map_or("", |m| m.as_str())
+                                .to_string()
+                                .replace(&['(', ')', ' ', '\t'][..], "");
+                            let replacement = caps[3].to_string();
+
+                            let mut param_list = Vec::new();
+                            for t in params.split(",") {
+                                if !t.is_empty() {
+                                    param_list.push(t.to_string());
+                                }
+                            }
+
+                            let m = Macro {
+                                replacement: replacement,
+                                params: param_list,
+                            };
+                            debug!("Macro detected: name:{:?} => {:?}", name, m);
+
+                            MACROS.lock().unwrap().insert(name, m);
+                        }
                     }
                     _ => {
-                        res.push_str(line);
-                        res.push_str("\n");
+                        // not directive starting sentence, so replace the token if it's defined before.
+                        // check every identifier name
+                        res.push_str(&replace(line.to_string()));
+                        res.push('\n');
                     }
                 }
             }
-            _ => {
-                // not directive starting sentence, so replace the token if it's defined before.
-                // check every identifier name
-                res.push_str(&replace(line.to_string()));
-                res.push('\n');
-            }
+            None => break,
         }
     }
     return Ok(res);
