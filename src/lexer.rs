@@ -78,7 +78,7 @@ pub enum TokType {
     // TODO: this should be done when we found this is a typedef name,
     //       typedef LL int, then LL is typedef_name
     TypedefName,
-    ELLIPSIS,                    // ..=
+    ELLIPSIS,                    // ...
     EnumerationConstant(String), // TODO: add check
     TYPEDEF,
     EXTERN,
