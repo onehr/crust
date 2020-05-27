@@ -21,6 +21,7 @@
 //       4. add floating point number support.
 //       5. number with postfix.
 
+#[allow(dead_code)]
 #[derive(PartialEq, Clone, Debug)]
 pub enum TokType {
     LBrace,       // {
@@ -77,7 +78,7 @@ pub enum TokType {
     // TODO: this should be done when we found this is a typedef name,
     //       typedef LL int, then LL is typedef_name
     TypedefName,
-    ELLIPSIS,                    // ...
+    ELLIPSIS,                    // ..=
     EnumerationConstant(String), // TODO: add check
     TYPEDEF,
     EXTERN,
@@ -217,7 +218,7 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                     it.next(); // skip '
                 }
             }
-            '0'...'9' => {
+            '0'..='9' => {
                 it.next();
                 let mut number = c
                     .to_string()
@@ -230,13 +231,13 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                 }
                 result.push(TokType::IConstant(number));
             }
-            'a'...'z' | 'A'...'Z' | '_' => {
+            'a'..='z' | 'A'..='Z' | '_' => {
                 it.next();
                 let mut s = String::new();
                 s.push(c);
                 while let Some(&tmp) = it.peek() {
                     match tmp {
-                        'a'...'z' | 'A'...'Z' | '0'...'9' | '_' => {
+                        'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => {
                             s.push(tmp);
                             it.next();
                         }
@@ -592,7 +593,7 @@ pub fn lex(input: &str) -> Result<Vec<TokType>, String> {
                 result.push(TokType::Comma);
                 it.next();
             }
-            ' ' | '\n' | '\t' | '\r' => {
+            ' ' | '\n' | '\t' | '\r' | '#' => {
                 // skip
                 it.next();
             }

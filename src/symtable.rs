@@ -17,24 +17,24 @@
 
 const _X86_64_CHAR_BYTES: u64 = 1;
 const _X86_64_SHORT_BYTES: u64 = 2;
-const X86_64_INT_BYTES: u64 = 4;
+const _X86_64_INT_BYTES: u64 = 4;
 const _X86_64_LONG_BYTES: u64 = 8;
 
-const NUM_REG: usize = 16;
+const _NUM_REG: usize = 16;
 
-const _B64_REG_NAMES: [&str; NUM_REG] = [
+const _B64_REG_NAMES: [&str; _NUM_REG] = [
     "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "rbp", "rsp", "r8", "r9", "r10", "r11", "r12", "r13",
     "r14", "r15",
 ];
-const _B32_REG_NAMES: [&str; NUM_REG] = [
+const _B32_REG_NAMES: [&str; _NUM_REG] = [
     "eax", "ebx", "ecx", "edx", "esi", "edi", "ebp", "esp", "r8d", "r9d", "r10d", "r11d", "r12d",
     "r13d", "r14d", "r15d",
 ];
-const _B16_REG_NAMES: [&str; NUM_REG] = [
+const _B16_REG_NAMES: [&str; _NUM_REG] = [
     "ax", "bx", "cx", "dx", "si", "di", "bp", "sp", "r8w", "r9w", "r10w", "r11w", "r12w", "r13w",
     "r14w", "r15w",
 ];
-const _B8_REG_NAMES: [&str; NUM_REG] = [
+const _B8_REG_NAMES: [&str; _NUM_REG] = [
     "al", "bl", "cl", "dl", "sil", "dil", "bpl", "spl", "r8b", "r9b", "r10b", "r11b", "r12b",
     "r13b", "r14b", "r15b",
 ];
@@ -45,6 +45,7 @@ pub struct SymbolRecord {
     pub attr: SymbolAttr,
 }
 
+#[allow(dead_code)]
 impl SymbolRecord {
     pub fn new(s: String, a: SymbolAttr) -> SymbolRecord {
         SymbolRecord {
@@ -152,6 +153,7 @@ impl TypeExpression {
     }
 }
 
+#[allow(dead_code)]
 #[derive(PartialEq, Clone, Debug)]
 pub enum StorageClass {
     Local,
@@ -174,12 +176,13 @@ pub struct SymbolAttr {
                    // loc: SourceLoc// TODO: add source code location
 }
 
+#[allow(dead_code)]
 impl SymbolAttr {
     pub fn new() -> SymbolAttr {
         SymbolAttr {
             volatile: false,
-            size: X86_64_INT_BYTES,
-            boundary: X86_64_INT_BYTES,
+            size: _X86_64_INT_BYTES,
+            boundary: _X86_64_INT_BYTES,
             base_type: TypeExpression::new_val(BaseType::Int),
             n_elements: 1,
             register: false,

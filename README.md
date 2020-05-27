@@ -8,10 +8,10 @@
 
 A simple C compiler written in the Rust-lang. (early development stage, started at Mar 30, 2019)
 
-**(PS. this is the development branch, 
-if you want to see how to write a simple c compiler in rust, you should check 
-[branch toy](https://github.com/onehr/crust/tree/toy), 
-which contains a simple c compiler written in rust without extra libs, 
+**(PS. this is the development branch,
+if you want to see how to write a simple c compiler in rust, you should check
+[branch toy](https://github.com/onehr/crust/tree/toy),
+which contains a simple c compiler written in rust without extra libs,
 it can read simple c source code and produce x86-64 assembly code).**
 
 ## Project Goal
@@ -20,7 +20,7 @@ Should follow the C11 Standard and generate binary code from C source code.
 This compiler is in the very early development stage,
 the plan is to continue developing it until it can compile real-world applications.
 
-If you are interested in `crust` and want to contribute, feel free to join the Gitter chat room, 
+If you are interested in `crust` and want to contribute, feel free to join the Gitter chat room,
 we have already got some contributors now who are interested in building this project.
 
 ## Milestone 0.1 Goal
@@ -37,8 +37,8 @@ we have already got some contributors now who are interested in building this pr
     - [X] comment support `/**/ and //`
     - [X] line concatenation with ` \ `
     - [X] object-like macro expansion
-    - [ ] function-like macro expansion
-    - [ ] should support all directives later
+    - [X] function-like macro expansion
+    - [ ] should support all directives (ifdef, elif, endif, ...)
 - Lexer (working on)
     - [X] lex all c11 keywords
     - [ ] the floating point number and number with postfix should be supported later.
@@ -58,6 +58,9 @@ we have already got some contributors now who are interested in building this pr
 * Assembly code generator (TODO)
 * Assembler (TODO)
 * Debugger (Working on, in another [repo](https://github.com/onehr/dbrs))
+* Code clean up
+    - [ ] Remove `#[allow(dead_code)]`
+
 ## Requirements
 
 You need a valid rust environment, Cargo.
@@ -69,10 +72,7 @@ $ cargo build # use this command to build the project
 ```
 run
 ```shell
-$ cargo run -- -E source_file.c -o output_file.c # generate preprocessed file
-$ cargo run -- --crust-print-source-token source_file.c -o output_file.c # print the token
-$ cargo run -- --crust-print-source-ast source_file.c -o output_file.c # print the ast
-
+$ cargo run [FLAGS] <files> ...
 ```
 
 ## Running Tests
@@ -83,7 +83,7 @@ $ ./test_dev.sh
 ```
 
 ## Benchmark
-(PS. This is pretty time consuming, 
+(PS. This is pretty time consuming,
 cause benchmark will do lots of iterations to test different layers' performance.
 
 Might take 20 to 30 minutes until it is finished.
@@ -93,7 +93,7 @@ Run:
 $ cargo bench
 ```
 
-After it is finished, 
+After it is finished,
 you can open `target/criterion/report/index.html` in your web browser to see the details of performance.
 
 ## License

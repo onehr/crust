@@ -4,3 +4,4 @@ gen/
 *.s
 a.out
 b.out
+.vscode

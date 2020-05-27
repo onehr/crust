@@ -26,8 +26,8 @@ use crate::lexer;
 use crate::symtable;
 
 pub fn judge_cast(
-    to_type: &symtable::TypeExpression,
-    from_type: &symtable::TypeExpression,
+    _to_type: &symtable::TypeExpression,
+    _from_type: &symtable::TypeExpression,
 ) -> bool {
     // TODO: should finish a judge function:
     //       judge whether can we use type_name to cast the cast_expression
@@ -59,7 +59,7 @@ pub fn judge_type_same(
 
 pub fn implicit_type_cast(
     l_type: &symtable::TypeExpression,
-    r_type: &symtable::TypeExpression,
+    _r_type: &symtable::TypeExpression,
 ) -> Result<symtable::TypeExpression, String> {
     // TODO: implicit convert r_type to l_type, if able then return TypeExpression,
     //       else return Err. Now just simply return l_type.
@@ -75,6 +75,7 @@ pub fn implicit_type_cast(
 /// # Return
 /// * Ok -> Ok(())
 /// * Err -> Err(msg)
-pub fn sema_driver(tree: &ParseNode, c_src_name: &str) -> Result<(), String> {
+#[allow(dead_code)]
+pub fn sema_driver(_tree: &ParseNode, _c_src_name: &str) -> Result<(), String> {
     return Ok(());
 }
