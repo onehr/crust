@@ -56,8 +56,6 @@ we have already got some contributors now who are interested in building this pr
 * IR generator (TODO)
 * Optimizer (TODO)
 * Assembly code generator (TODO)
-* Assembler (TODO)
-* Debugger (Working on, in another [repo](https://github.com/onehr/dbrs))
 * Code clean up
     - [ ] Remove `#[allow(dead_code)]`
 
