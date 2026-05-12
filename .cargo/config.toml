@@ -1,0 +1,5 @@
+# cargo xtask <subcommand> runs the workspace's xtask binary.
+# This is the matklad/cargo-xtask convention adopted by rust-analyzer,
+# wasmtime, and similar Rust projects.
+[alias]
+xtask = "run --package xtask --release --"

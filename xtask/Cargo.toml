@@ -1,0 +1,23 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Project automation tasks for crust (dashboard generation, hygiene scans)."
+
+# Split into lib + bin so integration tests can call into the same code paths
+# that the CLI uses. The lib carries the logic; main.rs is only argument parsing.
+[lib]
+name = "xtask"
+path = "src/lib.rs"
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+regex = "1.11"
+
+[dev-dependencies]
+tempfile = "3"
