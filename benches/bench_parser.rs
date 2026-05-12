@@ -1,14 +1,9 @@
-extern crate crust;
-#[macro_use]
-extern crate criterion;
-
-use criterion::black_box;
-use criterion::Criterion;
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 use crust::{cpp, lexer, parser};
-use std::{error, fs, path::PathBuf};
+use std::{fs, path::PathBuf};
 
-fn criterion_benchmark(c: &mut Criterion) -> Result<(), Box<dyn error::Error>> {
+fn criterion_benchmark(c: &mut Criterion) {
     let input_files = &[
         "test/valid/nested_scope_2.c",
         "test/valid/consecutive_declarations.c",
@@ -141,19 +136,18 @@ fn criterion_benchmark(c: &mut Criterion) -> Result<(), Box<dyn error::Error>> {
         "test/valid/eq_false.c",
     ];
     for input_file in input_files.iter() {
-        let input_file_contents = fs::read_to_string(input_file.clone())?;
+        let input_file_contents = fs::read_to_string(input_file).expect("read input file");
         // 1. Preprocessing
         let contents_after_cpp =
-            cpp::cpp_driver(input_file_contents, PathBuf::from(input_file.clone()))?;
+            cpp::cpp_driver(input_file_contents, PathBuf::from(input_file)).expect("cpp_driver");
         // 2. lexing
-        let tokens = lexer::lex(&contents_after_cpp)?;
-        let name = input_file.clone();
+        let tokens = lexer::lex(&contents_after_cpp).expect("lex");
+        let name = input_file.to_string();
 
         c.bench_function(&format!("parse {}", input_file), move |b| {
             b.iter(|| parser::parser_driver(black_box(&tokens), &name))
         });
     }
-    return Ok(());
 }
 
 criterion_group!(benches, criterion_benchmark);

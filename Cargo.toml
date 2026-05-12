@@ -2,15 +2,13 @@
 name = "crust"
 version = "0.1.0"
 authors = ["onehrxn <waharaxn@gmail.com>"]
-edition = "2018"
+edition = "2024"
 
 [dependencies]
-lazy_static = "1.4.0"
-clap = "2.33.0"
-regex = "1.3.5"
+clap = { version = "4", features = ["derive"] }
+regex = "1.11"
 log = "0.4"
-simple_logger = "1.4.0"
-loggerv = "0.7"
+simple_logger = "5"
 
 [features]
 debug = []
@@ -20,7 +18,7 @@ token = []
 as = []
 
 [dev-dependencies]
-criterion = "0.2"
+criterion = "0.5"
 
 [[bench]]
 name = "bench_lexer"

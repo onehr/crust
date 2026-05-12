@@ -1,14 +1,9 @@
-extern crate crust;
-#[macro_use]
-extern crate criterion;
-
-use criterion::black_box;
-use criterion::Criterion;
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 use crust::cpp;
-use std::{error, fs, path::PathBuf};
+use std::{fs, path::PathBuf};
 
-fn criterion_benchmark(c: &mut Criterion) -> Result<(), Box<dyn error::Error>> {
+fn criterion_benchmark(c: &mut Criterion) {
     // TODO: change this to iter through every c file under "test/valid/cpp"
     let input_files = &[
         "test/valid/cpp/macro_object.c",
@@ -30,7 +25,6 @@ fn criterion_benchmark(c: &mut Criterion) -> Result<(), Box<dyn error::Error>> {
             })
         });
     }
-    return Ok(());
 }
 
 criterion_group!(benches, criterion_benchmark);

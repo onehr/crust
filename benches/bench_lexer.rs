@@ -1,14 +1,9 @@
-extern crate crust;
-#[macro_use]
-extern crate criterion;
-
-use criterion::black_box;
-use criterion::Criterion;
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 use crust::lexer;
-use std::{error, fs};
+use std::fs;
 
-fn criterion_benchmark(c: &mut Criterion) -> Result<(), Box<dyn error::Error>> {
+fn criterion_benchmark(c: &mut Criterion) {
     let input_files = &[
         "test/valid/nested_scope_2.c",
         "test/valid/consecutive_declarations.c",
@@ -145,7 +140,6 @@ fn criterion_benchmark(c: &mut Criterion) -> Result<(), Box<dyn error::Error>> {
             b.iter(|| lexer::lex(black_box(&fs::read_to_string(input_file).unwrap())))
         });
     }
-    return Ok(());
 }
 
 criterion_group!(benches, criterion_benchmark);

@@ -16,12 +16,11 @@
 // cpp.rs: Simple c preprocessor
 // -----------------------------------------------------------------------------
 
-use lazy_static::lazy_static;
 use log::{debug, error};
 use regex::Regex;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 use std::{error, fs, path::Path};
 
 #[derive(Debug)]
@@ -29,12 +28,13 @@ struct Macro {
     replacement: String,
     params: Vec<String>,
 }
-lazy_static! {
-    static ref MACROS: Mutex<HashMap<String, Macro>> = {
-        let m = HashMap::new();
-        Mutex::new(m)
-    };
-}
+
+static MACROS: LazyLock<Mutex<HashMap<String, Macro>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+static RE_MACRO: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^[ \t]*#define[ \t]+([A-Za-z0-9_]+)(\(.*\))?[ \t]*((?:.*\\\r?\n)*.*)").unwrap()
+});
 
 fn trigraph_processor(input: String) -> Result<String, String> {
     // Trigraph:       ??(  ??)  ??<  ??>  ??=  ??/  ??'  ??!  ??-
@@ -341,12 +341,6 @@ fn directive_handler(input: String) -> Result<String, Box<dyn error::Error>> {
                 }
                 match char::from(line.trim_start().as_bytes()[0]) {
                     '#' => {
-                        lazy_static! {
-                            static ref RE_MACRO: Regex = Regex::new(
-                                r"^[ \t]*#define[ \t]+([A-Za-z0-9_]+)(\(.*\))?[ \t]*((?:.*\\\r?\n)*.*)"
-                            )
-                            .unwrap();
-                        }
                         if RE_MACRO.is_match(line) {
                             let caps = RE_MACRO.captures(line).unwrap();
                             let name = caps[1].to_string();
