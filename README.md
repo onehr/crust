@@ -6,6 +6,52 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/onehr/crust.svg?style=plastic)
 ![GitHub](https://img.shields.io/github/license/onehr/crust.svg)
 
+<!-- DASHBOARD:BEGIN -->
+## Project status
+
+> **Working tree was dirty at generation time** — figures below reflect uncommitted changes, not commit `3f3d7d6c1893`.
+
+_Generated for commit `3f3d7d6c1893` on `Linux 6.18.5 x86_64`, toolchain `rustc 1.94.1 (e408947bf 2026-03-25)`._
+
+### Modules (LOC)
+
+| Module | LOC |
+|---|---:|
+| `parser.rs` | 3668 |
+| `gen.rs` | 1833 |
+| `lexer.rs` | 606 |
+| `cpp.rs` | 398 |
+| `symtable.rs` | 256 |
+| `ast.rs` | 113 |
+| `sema.rs` | 81 |
+| `main.rs` | 58 |
+| `lib.rs` | 6 |
+| **total** | **7019** |
+
+### Hygiene (heuristic grep over `src/`)
+
+| `.unwrap()` | `.clone()` | `panic!` | `unsafe` |
+|---:|---:|---:|---:|
+| 32 | 280 | 22 | 0 |
+
+### Orphan modules (present on disk, not declared by any `mod`)
+
+- `gen.rs`
+
+### Test corpus (file counts; pass/fail not measured here)
+
+| Path | Files |
+|---|---:|
+| `test/valid/*.c` | 130 |
+| `test/invalid/*.c` | 4 |
+| `test/valid/parser/*.c` | 1 |
+| `test/valid/cpp/*.c` | 10 |
+| `sample_code/*.c` | 5 |
+| **total** | **150** |
+
+Behavioral signals (test pass/fail, benchmark throughput) are not part of this static dashboard. Run `./test_dev.sh` for parser coverage and `cargo bench` for performance.
+<!-- DASHBOARD:END -->
+
 A simple C compiler written in the Rust-lang. (early development stage, started at Mar 30, 2019)
 
 **(PS. this is the development branch,
