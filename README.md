@@ -1,144 +1,153 @@
-# CRUST
-[![Build Status](https://travis-ci.com/onehr/crust.svg?branch=master)](https://travis-ci.com/onehr/crust)
-[![Gitter](https://badges.gitter.im/crust-dev/community.svg)](https://gitter.im/crust-dev/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fonehr%2Fcrust.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fonehr%2Fcrust?ref=badge_shield)
-[![](https://tokei.rs/b1/github/onehr/crust)](https://github.com/onehr/crust)
-![GitHub commit activity](https://img.shields.io/github/commit-activity/m/onehr/crust.svg?style=plastic)
-![GitHub](https://img.shields.io/github/license/onehr/crust.svg)
+# Bridge
 
-<!-- DASHBOARD:BEGIN -->
-## Project status
+> Neurosymbolic intent-to-implementation verification.
+> An LLM proposes a formal contract; an SMT solver disposes.
+> When the symbolic backend cannot decide, the verdict is
+> `INCONCLUSIVE` — *never* a false `VERIFIED`.
 
-> **Working tree was dirty at generation time** — figures below reflect uncommitted changes, not commit `3f3d7d6c1893`.
+## What this is
 
-_Generated for commit `3f3d7d6c1893` on `Linux 6.18.5 x86_64`, toolchain `rustc 1.94.1 (e408947bf 2026-03-25)`._
+A small kernel that answers, for a candidate implementation, one hard
+question:
 
-### Modules (LOC)
+> Does this implementation actually realize the intention it claims to
+> realize, and what is the evidence?
 
-| Module | LOC |
-|---|---:|
-| `parser.rs` | 3668 |
-| `gen.rs` | 1833 |
-| `lexer.rs` | 606 |
-| `cpp.rs` | 398 |
-| `symtable.rs` | 256 |
-| `ast.rs` | 113 |
-| `sema.rs` | 81 |
-| `main.rs` | 58 |
-| `lib.rs` | 6 |
-| **total** | **7019** |
+with confidence strictly higher than "an LLM said so", and cost
+strictly lower than "a human wrote a Coq proof".
 
-### Hygiene (heuristic grep over `src/`)
+The bet: **LLMs are good *proposers* of formal contracts and bad
+*deciders* of correctness; SMT solvers are good deciders and bad
+proposers. A disciplined composition can outperform either alone.**
 
-| `.unwrap()` | `.clone()` | `panic!` | `unsafe` |
-|---:|---:|---:|---:|
-| 32 | 280 | 22 | 0 |
+## Quickstart
 
-### Orphan modules (present on disk, not declared by any `mod`)
-
-- `gen.rs`
-
-### Test corpus (file counts; pass/fail not measured here)
-
-| Path | Files |
-|---|---:|
-| `test/valid/*.c` | 130 |
-| `test/invalid/*.c` | 4 |
-| `test/valid/parser/*.c` | 1 |
-| `test/valid/cpp/*.c` | 10 |
-| `sample_code/*.c` | 5 |
-| **total** | **150** |
-
-Behavioral signals (test pass/fail, benchmark throughput) are not part of this static dashboard. Run `./test_dev.sh` for parser coverage and `cargo bench` for performance.
-<!-- DASHBOARD:END -->
-
-A simple C compiler written in the Rust-lang. (early development stage, started at Mar 30, 2019)
-
-**(PS. this is the development branch,
-if you want to see how to write a simple c compiler in rust, you should check
-[branch toy](https://github.com/onehr/crust/tree/toy),
-which contains a simple c compiler written in rust without extra libs,
-it can read simple c source code and produce x86-64 assembly code).**
-
-## Project Goal
-Should follow the C11 Standard and generate binary code from C source code.
-
-This compiler is in the very early development stage,
-the plan is to continue developing it until it can compile real-world applications.
-
-If you are interested in `crust` and want to contribute, feel free to join the Gitter chat room,
-we have already got some contributors now who are interested in building this project.
-
-## Milestone 0.1 Goal
-1. Finish the preprocessor.
-2. Support all C11 grammar rules.
-3. replace gcc with it's own assembler to generate binary code
-4. Stabilize the interfaces among different layers.
-5. With some possible optimizations.
-
-## Track of current progress
-- Preprocessor (working on)
-    - [X] support `#include "local-header"`, nested-include is supported (need to add more features)
-    - [X] Trigraph translation
-    - [X] comment support `/**/ and //`
-    - [X] line concatenation with ` \ `
-    - [X] object-like macro expansion
-    - [X] function-like macro expansion
-    - [ ] should support all directives (ifdef, elif, endif, ...)
-- Lexer (working on)
-    - [X] lex all c11 keywords
-    - [ ] the floating point number and number with postfix should be supported later.
-* Parser (almost done, need to be carefully tested)
-    - [X] support c11 standard and generate ast tree
-    - [ ] better ast printer
-    - [ ] should be able handle typedef
-    - [ ] add more tests for parser
-* Semantics Analyzer (working on)
-    - [X] Type system
-    - [ ] Type checker
-* Benchmark (working on)
-    - [X] Use [Criterion.rs](https://github.com/bheisler/criterion.rs#quickstart) to do benchmarks.
-    - [ ] Generate more informations from benchmarking.
-* IR generator (TODO)
-* Optimizer (TODO)
-* Assembly code generator (TODO)
-* Code clean up
-    - [ ] Remove `#[allow(dead_code)]`
-
-## Requirements
-
-You need a valid rust environment, Cargo.
-
-## Build
-(PS. Now the crust can only preprocess, lex, and parse the source code, the generator was disabled now).
 ```bash
-$ cargo build # use this command to build the project
-```
-run
-```shell
-$ cargo run [FLAGS] <files> ...
-```
+# clone + install (uv is recommended; pip also works)
+uv sync --extra dev
+uv pip install -e .
 
-## Running Tests
+# the kernel ships with a deterministic offline demo
+uv run bridge demo
 
-Run:
-```bash
-$ ./test_dev.sh
-```
+# run the full test suite (10 tests; mock LLM, no network)
+uv run pytest
 
-## Benchmark
-(PS. This is pretty time consuming,
-cause benchmark will do lots of iterations to test different layers' performance.
-
-Might take 20 to 30 minutes until it is finished.
-)
-Run:
-```bash
-$ cargo bench
+# live verification with a real LLM (requires OPENROUTER_API_KEY)
+export OPENROUTER_API_KEY=sk-or-...
+uv run bridge demo --live
 ```
 
-After it is finished,
-you can open `target/criterion/report/index.html` in your web browser to see the details of performance.
+## What a verdict looks like
+
+For a correct `abs(x)`:
+
+```
+verdict: VERIFIED
+proof artifact: z3 UNSAT for (pre AND result==body AND NOT post);
+                checked under timeout 5000 ms; args=['x']; sorts=['Int']->Int
+```
+
+For a buggy `abs(x): return x`:
+
+```
+verdict: COUNTER_EXAMPLE
+args:        (-1,)
+observed:    -1
+expected:    1
+discovered:  z3
+```
+
+Both verdicts also surface the *contract that was checked* — the
+LLM-proposed formal interpretation of the user's intent — so a human
+auditor can confirm the verdict matches what they actually wanted to
+verify.
+
+## The three verdicts
+
+| Verdict           | Meaning                                                                                                |
+|-------------------|--------------------------------------------------------------------------------------------------------|
+| `VERIFIED`        | The symbolic engine *proved* the implementation satisfies the contract on every input. Backed by a machine-checkable artifact. |
+| `COUNTER_EXAMPLE` | A concrete input was found for which the implementation violates the contract. Backed by reproducible (args, observed, expected). |
+| `INCONCLUSIVE`    | Neither could be established within budget. The implementation may or may not realize the intention; the kernel does not know. |
+
+`VERIFIED` is reserved for *positive proof*. Absence of counter-examples
+is **not** verification. A run that fuzzes 10 000 inputs without finding
+a failure returns `INCONCLUSIVE`, never `VERIFIED`. This rule is what
+distinguishes Bridge from LLM-as-judge wrappers.
+
+## Architecture
+
+```
+   user --> [Intent]                       [Implementation] <-- user
+              |                                   |
+              v                                   v
+              +-------- Stage 1: PROPOSE ---------+
+              |   LLM emits a FormalContract      |
+              |   (JSON, strict schema)           |
+              +-----------------+-----------------+
+                                |
+              +--------- Stage 2: VALIDATE -------+
+              |   schema check + accepts examples |
+              |   + well-formed z3 / Python       |
+              +-----------------+-----------------+
+                                |
+              +--------- Stage 3: DISPOSE --------+
+              |   z3 symbolic decision            |
+              |   then hypothesis fuzz fallback   |
+              |   never promotes "no cex" to     |
+              |   "verified"                      |
+              +-----------------+-----------------+
+                                |
+                                v
+                            [Verdict]
+```
+
+See [`docs/01-architecture.md`](docs/01-architecture.md) for the
+detailed protocol, supported fragment, and SOP layer.
+
+## Documentation
+
+| File                          | What it covers                                                  |
+|-------------------------------|-----------------------------------------------------------------|
+| [`docs/00-prior-art.md`](docs/00-prior-art.md)        | Compressed survey of existing tools and the gap argument |
+| [`docs/01-architecture.md`](docs/01-architecture.md) | Kernel design, types, SOPs, supported fragment, test plan |
+
+## Status
+
+V1 pilot. The supported fragment is intentionally small:
+
+* Pure Python functions of integer arguments returning an integer
+* Bodies using arithmetic, comparison, conditional expressions, and
+  `if/else` returns
+* No loops, recursion, classes, or external calls
+
+Functions outside the fragment are reported as `INCONCLUSIVE` with
+reason `out_of_fragment`. Extending the fragment is the V2 roadmap.
+
+## What this is not
+
+* Not an LLM coding agent. Cursor, Aider, Claude Code, Devin already exist.
+* Not an LLM-as-judge wrapper. The LLM proposes; it never decides.
+* Not a UX layer over Coq. The contract is auto-proposed, not user-written.
+* Not a test generator. The output is a verdict with a proof artifact, not more tests.
+
+## Acknowledgements / prior art
+
+Bridge sits in a crowded space. The closest direct neighbours are
+**CrossHair** (Python symbolic execution against hand-written
+contracts) and the **Draft-Sketch-Prove** family of LLM-formal hybrids.
+See [`docs/00-prior-art.md`](docs/00-prior-art.md) for the honest
+positioning.
+
+## Legacy
+
+This repository previously hosted `crust`, a toy C compiler written
+in Rust while the author was learning Rust. That project lives at
+[`legacy/crust/`](legacy/crust/) and is preserved as a historical
+learning artifact; it is no longer under active development. Bridge
+is a fresh project that shares the repository, not the codebase.
 
 ## License
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fonehr%2Fcrust.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fonehr%2Fcrust?ref=badge_large)
+
+Apache 2.0 — see [`LICENSE`](LICENSE).
